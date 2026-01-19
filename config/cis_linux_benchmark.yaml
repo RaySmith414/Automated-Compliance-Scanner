@@ -1,0 +1,158 @@
+# CIS Benchmark Configuration for Ubuntu Linux 22.04 LTS
+# Version: 1.0.0
+# Based on: CIS Ubuntu Linux 22.04 LTS Benchmark v1.0.0
+# Author: Rayshaun Smith
+
+benchmark:
+  name: "CIS Ubuntu Linux 22.04 LTS"
+  version: "1.0.0"
+  profile: "Level 1 - Server"
+  description: "CIS Benchmark compliance checks for Ubuntu Linux"
+
+categories:
+  filesystem:
+    description: "Initial Setup - Filesystem Configuration"
+    controls:
+      - id: "1.1.1.1"
+        check_id: "FS-001"
+        title: "Ensure mounting of cramfs filesystems is disabled"
+        scored: true
+        level: 1
+        description: "The cramfs filesystem type is a compressed read-only Linux filesystem"
+        rationale: "Removing support for unneeded filesystem types reduces the local attack surface"
+
+      - id: "1.1.1.3"
+        check_id: "FS-002"
+        title: "Ensure mounting of squashfs filesystems is disabled"
+        scored: true
+        level: 2
+        description: "The squashfs filesystem type is a compressed read-only Linux filesystem"
+        rationale: "Removing support for unneeded filesystem types reduces the local attack surface"
+
+      - id: "1.1.1.4"
+        check_id: "FS-003"
+        title: "Ensure mounting of udf filesystems is disabled"
+        scored: true
+        level: 1
+        description: "The udf filesystem type is the Universal Disk Format"
+        rationale: "Removing support for unneeded filesystem types reduces the local attack surface"
+
+      - id: "1.1.2"
+        check_id: "FS-004"
+        title: "Ensure /tmp is a separate partition"
+        scored: true
+        level: 1
+        description: "The /tmp directory is a world-writable directory used for temporary storage"
+        rationale: "Placing /tmp on its own partition enables setting mount options to restrict access"
+
+      - id: "1.1.3"
+        check_id: "FS-005"
+        title: "Ensure noexec option set on /tmp partition"
+        scored: true
+        level: 1
+        description: "The noexec mount option specifies that the filesystem cannot contain executables"
+        rationale: "Since /tmp is a world-writable directory, setting noexec prevents execution of malicious code"
+
+  authentication:
+    description: "Access, Authentication and Authorization"
+    controls:
+      - id: "5.5.1.1"
+        check_id: "AUTH-001"
+        title: "Ensure password expiration is 365 days or less"
+        scored: true
+        level: 1
+        description: "The PASS_MAX_DAYS parameter in /etc/login.defs allows an administrator to force passwords to expire"
+        rationale: "Forces users to change their passwords regularly"
+
+      - id: "5.2.10"
+        check_id: "AUTH-007"
+        title: "Ensure SSH root login is disabled"
+        scored: true
+        level: 1
+        cce: "CCE-27445-6"
+        description: "The PermitRootLogin parameter specifies if the root user can log in using ssh"
+        rationale: "Disabling direct root logins ensures an audit trail when administrative actions are performed"
+
+      - id: "5.2.11"
+        check_id: "AUTH-008"
+        title: "Ensure SSH PermitEmptyPasswords is disabled"
+        scored: true
+        level: 1
+        description: "The PermitEmptyPasswords parameter specifies if the server allows login to accounts with empty password strings"
+        rationale: "Empty passwords are a significant security risk"
+
+  network:
+    description: "Network Configuration"
+    controls:
+      - id: "3.1.1"
+        check_id: "NET-001"
+        title: "Ensure IP forwarding is disabled"
+        scored: true
+        level: 1
+        description: "The net.ipv4.ip_forward flag is used to tell the server whether it can forward packets"
+        rationale: "Setting the flag to 0 ensures that a server with multiple interfaces cannot forward packets"
+
+      - id: "3.4.1.1"
+        check_id: "NET-007"
+        title: "Ensure firewall is active"
+        scored: true
+        level: 1
+        description: "A firewall utility (ufw, firewalld, or iptables) should be actively running"
+        rationale: "A firewall is essential for protecting the system from unauthorized network access"
+
+  logging:
+    description: "Logging and Auditing"
+    controls:
+      - id: "4.2.1.1"
+        check_id: "LOG-001"
+        title: "Ensure rsyslog is installed"
+        scored: true
+        level: 1
+        description: "The rsyslog package provides a system logging facility"
+        rationale: "The rsyslog package provides enhanced system logging capabilities"
+
+      - id: "4.2.1.2"
+        check_id: "LOG-002"
+        title: "Ensure rsyslog Service is enabled"
+        scored: true
+        level: 1
+        description: "The rsyslog daemon should be running"
+        rationale: "System logs should be recorded for security and troubleshooting purposes"
+
+  access_control:
+    description: "System Access, Authentication and Authorization"
+    controls:
+      - id: "6.1.2"
+        check_id: "AC-001"
+        title: "Ensure permissions on /etc/passwd are configured"
+        scored: true
+        level: 1
+        description: "The /etc/passwd file contains user account information"
+        rationale: "If attackers can gain read access to /etc/passwd, they can gain usernames"
+
+      - id: "6.1.3"
+        check_id: "AC-002"
+        title: "Ensure permissions on /etc/shadow are configured"
+        scored: true
+        level: 1
+        description: "The /etc/shadow file is used to store user password information"
+        rationale: "If attackers gain access to /etc/shadow, they could crack password hashes"
+
+  services:
+    description: "Services Configuration"
+    controls:
+      - id: "2.2.18"
+        check_id: "SVC-002"
+        title: "Ensure telnet server is not installed"
+        scored: true
+        level: 1
+        description: "The telnet-server package contains the telnetd daemon"
+        rationale: "Telnet sends all data in cleartext including passwords"
+
+      - id: "2.2.9"
+        check_id: "SVC-003"
+        title: "Ensure FTP server is not installed"
+        scored: true
+        level: 1
+        description: "FTP is an older protocol for transferring files"
+        rationale: "FTP sends all data and passwords in cleartext; use SFTP or SCP instead"

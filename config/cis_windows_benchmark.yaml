@@ -1,0 +1,114 @@
+# CIS Benchmark Configuration for Microsoft Windows Server 2019/2022
+# Version: 1.0.0
+# Based on: CIS Microsoft Windows Server 2019/2022 Benchmark
+# Author: Rayshaun Smith
+
+benchmark:
+  name: "CIS Microsoft Windows Server"
+  version: "1.0.0"
+  profile: "Level 1 - Member Server"
+  description: "CIS Benchmark compliance checks for Windows Server"
+
+categories:
+  authentication:
+    description: "Account Policies"
+    controls:
+      - id: "1.1.1"
+        check_id: "AUTH-001"
+        title: "Ensure 'Enforce password history' is set to '24 or more passwords'"
+        scored: true
+        level: 1
+        description: "This policy determines the number of unique passwords required before an old password can be reused"
+        rationale: "The longer a user uses the same password, the greater the chance of compromise"
+
+      - id: "1.1.2"
+        check_id: "AUTH-002"
+        title: "Ensure 'Maximum password age' is set to '365 or fewer days'"
+        scored: true
+        level: 1
+        description: "This policy defines how long a user can use their password before it expires"
+        rationale: "Regular password changes reduce the risk of compromised credentials"
+
+      - id: "1.1.4"
+        check_id: "AUTH-004"
+        title: "Ensure 'Minimum password length' is set to '14 or more characters'"
+        scored: true
+        level: 1
+        description: "This policy determines the minimum number of characters in a password"
+        rationale: "Longer passwords are exponentially harder to crack"
+
+  network:
+    description: "Network Security"
+    controls:
+      - id: "9.1.1"
+        check_id: "NET-001"
+        title: "Ensure Windows Firewall is enabled for all profiles"
+        scored: true
+        level: 1
+        description: "Windows Firewall should be enabled for Domain, Private, and Public profiles"
+        rationale: "A firewall provides protection against network-based attacks"
+
+      - id: "18.3.3"
+        check_id: "NET-002"
+        title: "Ensure 'Configure SMB v1 client driver' is set to 'Disable driver'"
+        scored: true
+        level: 1
+        description: "SMBv1 is a legacy protocol with known security vulnerabilities"
+        rationale: "Disabling SMBv1 reduces the attack surface and prevents EternalBlue-style attacks"
+
+  logging:
+    description: "Audit Policy Configuration"
+    controls:
+      - id: "17.5.1"
+        check_id: "LOG-001"
+        title: "Ensure 'Audit Logon' is set to 'Success and Failure'"
+        scored: true
+        level: 1
+        description: "This policy tracks logon attempts to the system"
+        rationale: "Auditing logon events helps detect unauthorized access attempts"
+
+      - id: "17.2.1"
+        check_id: "LOG-002"
+        title: "Ensure 'Audit User Account Management' is set to 'Success and Failure'"
+        scored: true
+        level: 1
+        description: "This policy tracks user account changes"
+        rationale: "Auditing account management helps detect unauthorized modifications"
+
+  access_control:
+    description: "User Rights and Permissions"
+    controls:
+      - id: "2.3.17.1"
+        check_id: "AC-001"
+        title: "Ensure 'User Account Control: Run all administrators in Admin Approval Mode' is set to 'Enabled'"
+        scored: true
+        level: 1
+        description: "User Account Control (UAC) requires administrators to approve elevation"
+        rationale: "UAC prevents malware from making unauthorized changes"
+
+      - id: "2.3.10.2"
+        check_id: "AC-004"
+        title: "Ensure 'Network access: Do not allow anonymous enumeration of SAM accounts' is set to 'Enabled'"
+        scored: true
+        level: 1
+        description: "Prevents anonymous users from enumerating SAM accounts"
+        rationale: "Reduces information available to potential attackers"
+
+  services:
+    description: "System Services"
+    controls:
+      - id: "2.2.38"
+        check_id: "SVC-001"
+        title: "Ensure 'Telnet' service is disabled"
+        scored: true
+        level: 1
+        description: "The Telnet service transmits data in cleartext"
+        rationale: "Telnet should never be used; use SSH or PowerShell remoting instead"
+
+      - id: "2.2.34"
+        check_id: "SVC-004"
+        title: "Ensure 'Remote Registry' service is disabled"
+        scored: true
+        level: 1
+        description: "The Remote Registry service allows remote access to the Windows registry"
+        rationale: "Disabling Remote Registry reduces the attack surface"
