@@ -1,0 +1,257 @@
+# NIST 800-53 Rev 5 Security Controls Reference
+# For mapping CIS Benchmark checks to federal security requirements
+# Author: Rayshaun Smith
+
+metadata:
+  standard: "NIST Special Publication 800-53"
+  revision: "5"
+  title: "Security and Privacy Controls for Information Systems and Organizations"
+  description: "Control mapping reference for Automated Compliance Scanner"
+
+control_families:
+  AC:
+    name: "Access Control"
+    description: "Access control policies and procedures"
+    controls:
+      AC-2:
+        name: "Account Management"
+        description: "Manage system accounts, group memberships, privileges, and associated authorizations"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["AUTH-004", "AUTH-005"]
+        implementation_guidance: |
+          - Define and document account types
+          - Establish conditions for group membership
+          - Identify authorized users and access privileges
+          - Require manager approval for accounts
+          - Review accounts periodically
+
+      AC-3:
+        name: "Access Enforcement"
+        description: "Enforce approved authorizations for logical access to information and system resources"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["AC-001", "AC-002", "AC-003"]
+        implementation_guidance: |
+          - Implement mandatory and discretionary access controls
+          - Control access to security functions
+          - Enforce separation of duties
+
+      AC-4:
+        name: "Information Flow Enforcement"
+        description: "Enforce approved authorizations for controlling the flow of information within the system and between connected systems"
+        baseline: ["MODERATE", "HIGH"]
+        related_checks: ["NET-007", "SVC-006"]
+        implementation_guidance: |
+          - Implement boundary protection mechanisms
+          - Control information flow between security domains
+          - Use encryption for information in transit
+
+      AC-6:
+        name: "Least Privilege"
+        description: "Employ the principle of least privilege, allowing only authorized accesses necessary to accomplish assigned tasks"
+        baseline: ["MODERATE", "HIGH"]
+        related_checks: ["FS-005", "FS-006", "FS-007", "AUTH-005", "AUTH-006", "AUTH-007", "AC-006"]
+        implementation_guidance: |
+          - Authorize access only to functions needed
+          - Restrict privileged accounts
+          - Prevent non-privileged users from executing privileged functions
+
+      AC-7:
+        name: "Unsuccessful Logon Attempts"
+        description: "Enforce a limit of consecutive invalid logon attempts by a user during a specified time period"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["AUTH-010"]
+        implementation_guidance: |
+          - Lock accounts after failed attempts
+          - Delay successive logon attempts
+          - Disable account after maximum failures
+
+      AC-17:
+        name: "Remote Access"
+        description: "Establish and document usage restrictions and implementation guidance for each type of remote access"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["AUTH-006", "AUTH-007"]
+        implementation_guidance: |
+          - Authorize remote access before allowing connections
+          - Monitor and control remote access
+          - Use encryption for remote access sessions
+
+  AU:
+    name: "Audit and Accountability"
+    description: "Audit and accountability policies and procedures"
+    controls:
+      AU-2:
+        name: "Audit Events"
+        description: "Identify the types of events that the system is capable of logging in support of the audit function"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["LOG-001", "LOG-002"]
+        implementation_guidance: |
+          - Determine auditable events based on security requirements
+          - Coordinate audit requirements with organizational needs
+          - Review and update audited events regularly
+
+      AU-3:
+        name: "Content of Audit Records"
+        description: "Audit records contain information that establishes what type of event occurred, when it occurred, where it occurred, the source, outcome, and identity associated with the event"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["LOG-001", "LOG-002"]
+        implementation_guidance: |
+          - Include date, time, and type of event
+          - Include user identity and source/destination addresses
+          - Include success/failure indicators
+
+      AU-4:
+        name: "Audit Storage Capacity"
+        description: "Allocate audit record storage capacity and configure auditing to reduce the likelihood of such capacity being exceeded"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["LOG-003", "LOG-004"]
+        implementation_guidance: |
+          - Allocate sufficient storage for audit logs
+          - Configure log rotation and archival
+          - Alert on storage capacity thresholds
+
+      AU-9:
+        name: "Protection of Audit Information"
+        description: "Protect audit information and audit logging tools from unauthorized access, modification, and deletion"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["LOG-003", "LOG-004", "LOG-005"]
+        implementation_guidance: |
+          - Implement access controls on audit logs
+          - Back up audit records to separate systems
+          - Use cryptographic mechanisms to protect integrity
+
+      AU-11:
+        name: "Audit Record Retention"
+        description: "Retain audit records for an organization-defined time period"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["LOG-004"]
+        implementation_guidance: |
+          - Retain records per organizational policy
+          - Ensure records are available for investigation
+          - Comply with regulatory retention requirements
+
+      AU-12:
+        name: "Audit Generation"
+        description: "Provide audit record generation capability for the event types the system is capable of auditing"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["LOG-002"]
+        implementation_guidance: |
+          - Enable audit generation on system components
+          - Allow authorized personnel to configure auditing
+          - Generate audit records with required content
+
+  CM:
+    name: "Configuration Management"
+    description: "Configuration management policies and procedures"
+    controls:
+      CM-7:
+        name: "Least Functionality"
+        description: "Configure the system to provide only essential capabilities and prohibit or restrict the use of functions, ports, protocols, and services"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["FS-001", "FS-002", "FS-003", "FS-005", "FS-006", "FS-007", "NET-001", "NET-002", "SVC-001", "SVC-002", "SVC-003", "SVC-004", "SVC-005", "SVC-006", "AC-006"]
+        implementation_guidance: |
+          - Review functions periodically and disable unnecessary ones
+          - Prevent program execution from unauthorized locations
+          - Whitelist authorized software
+
+      CM-8:
+        name: "System Component Inventory"
+        description: "Develop and document an inventory of system components that accurately reflects the system"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["AC-005"]
+        implementation_guidance: |
+          - Maintain accurate inventory of components
+          - Update inventory when components are installed/removed
+          - Include acquisition information and responsible parties
+
+  IA:
+    name: "Identification and Authentication"
+    description: "Identification and authentication policies and procedures"
+    controls:
+      IA-2:
+        name: "Identification and Authentication (Organizational Users)"
+        description: "Uniquely identify and authenticate organizational users and associate that unique identification with processes acting on behalf of those users"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["AUTH-005", "AUTH-007", "AUTH-008", "AUTH-009"]
+        implementation_guidance: |
+          - Implement unique user identification
+          - Use multi-factor authentication for privileged accounts
+          - Implement replay-resistant authentication
+
+      IA-5:
+        name: "Authenticator Management"
+        description: "Manage system authenticators by verifying the identity of individuals, initial authenticator content, and establishing administrative procedures"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["AUTH-001", "AUTH-002", "AUTH-003", "AUTH-004", "AUTH-008", "AUTH-009", "AC-002"]
+        implementation_guidance: |
+          - Establish authenticator strength requirements
+          - Change default authenticators
+          - Protect authenticators from unauthorized disclosure
+          - Implement password complexity and rotation
+
+  SA:
+    name: "System and Services Acquisition"
+    description: "System and services acquisition policies and procedures"
+    controls:
+      SA-4:
+        name: "Acquisition Process"
+        description: "Include security and privacy requirements and specifications in acquisition contracts based on an assessment of risk"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["SVC-001"]
+        implementation_guidance: |
+          - Include security requirements in contracts
+          - Require documentation of security functions
+          - Address supply chain risk management
+
+  SC:
+    name: "System and Communications Protection"
+    description: "System and communications protection policies and procedures"
+    controls:
+      SC-4:
+        name: "Information in Shared System Resources"
+        description: "Prevent unauthorized and unintended information transfer via shared system resources"
+        baseline: ["MODERATE", "HIGH"]
+        related_checks: ["FS-004"]
+        implementation_guidance: |
+          - Clear shared resources before reallocation
+          - Implement memory protection mechanisms
+          - Prevent information leakage between processes
+
+      SC-5:
+        name: "Denial-of-Service Protection"
+        description: "Protect against or limit the effects of denial-of-service attacks"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["NET-003", "NET-004", "NET-005", "NET-006"]
+        implementation_guidance: |
+          - Implement capacity management
+          - Use redundancy and load balancing
+          - Configure SYN cookies and other protections
+
+      SC-7:
+        name: "Boundary Protection"
+        description: "Monitor and control communications at the external managed interfaces to the system"
+        baseline: ["LOW", "MODERATE", "HIGH"]
+        related_checks: ["NET-001", "NET-002", "NET-003", "NET-004", "NET-005", "NET-006", "NET-007"]
+        implementation_guidance: |
+          - Implement firewall rules
+          - Use demilitarized zones for public services
+          - Control traffic between security zones
+
+      SC-8:
+        name: "Transmission Confidentiality and Integrity"
+        description: "Protect the confidentiality and integrity of transmitted information"
+        baseline: ["MODERATE", "HIGH"]
+        related_checks: ["SVC-002", "SVC-003"]
+        implementation_guidance: |
+          - Use encryption for data in transit
+          - Implement TLS/SSL for network communications
+          - Disable insecure protocols
+
+      SC-28:
+        name: "Protection of Information at Rest"
+        description: "Protect the confidentiality and integrity of information at rest"
+        baseline: ["MODERATE", "HIGH"]
+        related_checks: ["FS-001", "FS-002", "FS-003"]
+        implementation_guidance: |
+          - Use encryption for sensitive data storage
+          - Implement access controls on storage
+          - Protect cryptographic keys

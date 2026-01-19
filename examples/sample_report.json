@@ -1,0 +1,151 @@
+{
+  "report_metadata": {
+    "generated_at": "2024-01-15T14:30:00.000000",
+    "scanner_version": "1.0.0",
+    "report_format": "compliance-scanner-v1",
+    "author": "Rayshaun Smith",
+    "tool": "Automated Compliance Scanner"
+  },
+  "system_info": {
+    "hostname": "web-server-01",
+    "kernel": "5.15.0-91-generic",
+    "distribution": "Ubuntu 22.04.3 LTS",
+    "architecture": "x86_64"
+  },
+  "summary": {
+    "total_checks": 42,
+    "passed": 35,
+    "failed": 7,
+    "errors": 0,
+    "compliance_rate": 83.33,
+    "checks_by_severity": {
+      "critical": 8,
+      "high": 15,
+      "medium": 12,
+      "low": 7
+    },
+    "failed_by_severity": {
+      "critical": 1,
+      "high": 3,
+      "medium": 2,
+      "low": 1
+    },
+    "checks_by_category": {
+      "filesystem": {"total": 7, "passed": 5, "failed": 2},
+      "authentication": {"total": 10, "passed": 9, "failed": 1},
+      "network": {"total": 7, "passed": 5, "failed": 2},
+      "logging": {"total": 5, "passed": 5, "failed": 0},
+      "access_control": {"total": 6, "passed": 5, "failed": 1},
+      "services": {"total": 7, "passed": 6, "failed": 1}
+    },
+    "scan_timestamp": "2024-01-15T14:30:00.000000"
+  },
+  "checks": [
+    {
+      "id": "FS-001",
+      "category": "filesystem",
+      "name": "Ensure mounting of cramfs is disabled",
+      "severity": "high",
+      "status": "PASS",
+      "actual": "Module disabled",
+      "expected": "cramfs module should be disabled",
+      "remediation": "Add \"install cramfs /bin/true\" to /etc/modprobe.d/cramfs.conf",
+      "nist_controls": [
+        {"control_id": "CM-7", "control_name": "Least Functionality", "control_family": "Configuration Management"},
+        {"control_id": "SC-28", "control_name": "Protection of Information at Rest", "control_family": "System and Communications Protection"}
+      ]
+    },
+    {
+      "id": "AUTH-007",
+      "category": "authentication",
+      "name": "Ensure SSH root login is disabled",
+      "severity": "critical",
+      "status": "PASS",
+      "actual": "permitrootlogin no",
+      "expected": "PermitRootLogin no",
+      "remediation": "Set PermitRootLogin no in /etc/ssh/sshd_config",
+      "nist_controls": [
+        {"control_id": "AC-6", "control_name": "Least Privilege", "control_family": "Access Control"},
+        {"control_id": "AC-17", "control_name": "Remote Access", "control_family": "Access Control"},
+        {"control_id": "IA-2", "control_name": "Identification and Authentication (Organizational Users)", "control_family": "Identification and Authentication"}
+      ]
+    },
+    {
+      "id": "NET-007",
+      "category": "network",
+      "name": "Ensure firewall is active",
+      "severity": "critical",
+      "status": "FAIL",
+      "actual": "ufw: False, firewalld: False, iptables rules: False",
+      "expected": "At least one firewall should be active",
+      "remediation": "Enable ufw: sudo ufw enable",
+      "nist_controls": [
+        {"control_id": "SC-7", "control_name": "Boundary Protection", "control_family": "System and Communications Protection"},
+        {"control_id": "AC-4", "control_name": "Information Flow Enforcement", "control_family": "Access Control"}
+      ]
+    },
+    {
+      "id": "LOG-001",
+      "category": "logging",
+      "name": "Ensure rsyslog is installed",
+      "severity": "high",
+      "status": "PASS",
+      "actual": "rsyslog installed",
+      "expected": "rsyslog should be installed",
+      "remediation": "Install rsyslog: apt install rsyslog",
+      "nist_controls": [
+        {"control_id": "AU-2", "control_name": "Audit Events", "control_family": "Audit and Accountability"},
+        {"control_id": "AU-3", "control_name": "Content of Audit Records", "control_family": "Audit and Accountability"}
+      ]
+    },
+    {
+      "id": "SVC-002",
+      "category": "services",
+      "name": "Ensure telnet server is not installed",
+      "severity": "critical",
+      "status": "PASS",
+      "actual": "telnet server not installed",
+      "expected": "telnet server should not be installed",
+      "remediation": "Remove telnet server: apt remove telnetd",
+      "nist_controls": [
+        {"control_id": "CM-7", "control_name": "Least Functionality", "control_family": "Configuration Management"},
+        {"control_id": "SC-8", "control_name": "Transmission Confidentiality and Integrity", "control_family": "System and Communications Protection"}
+      ]
+    }
+  ],
+  "nist_summary": {
+    "controls_assessed": 12,
+    "controls": [
+      {"control_id": "AC-4", "control_name": "Information Flow Enforcement", "control_family": "Access Control", "checks_total": 2, "checks_passed": 1, "checks_failed": 1, "compliance_percentage": 50.0},
+      {"control_id": "AC-6", "control_name": "Least Privilege", "control_family": "Access Control", "checks_total": 8, "checks_passed": 7, "checks_failed": 1, "compliance_percentage": 87.5},
+      {"control_id": "AC-17", "control_name": "Remote Access", "control_family": "Access Control", "checks_total": 2, "checks_passed": 2, "checks_failed": 0, "compliance_percentage": 100.0},
+      {"control_id": "AU-2", "control_name": "Audit Events", "control_family": "Audit and Accountability", "checks_total": 2, "checks_passed": 2, "checks_failed": 0, "compliance_percentage": 100.0},
+      {"control_id": "AU-3", "control_name": "Content of Audit Records", "control_family": "Audit and Accountability", "checks_total": 2, "checks_passed": 2, "checks_failed": 0, "compliance_percentage": 100.0},
+      {"control_id": "CM-7", "control_name": "Least Functionality", "control_family": "Configuration Management", "checks_total": 15, "checks_passed": 13, "checks_failed": 2, "compliance_percentage": 86.7},
+      {"control_id": "IA-2", "control_name": "Identification and Authentication (Organizational Users)", "control_family": "Identification and Authentication", "checks_total": 4, "checks_passed": 4, "checks_failed": 0, "compliance_percentage": 100.0},
+      {"control_id": "IA-5", "control_name": "Authenticator Management", "control_family": "Identification and Authentication", "checks_total": 6, "checks_passed": 6, "checks_failed": 0, "compliance_percentage": 100.0},
+      {"control_id": "SC-7", "control_name": "Boundary Protection", "control_family": "System and Communications Protection", "checks_total": 7, "checks_passed": 5, "checks_failed": 2, "compliance_percentage": 71.4},
+      {"control_id": "SC-8", "control_name": "Transmission Confidentiality and Integrity", "control_family": "System and Communications Protection", "checks_total": 2, "checks_passed": 2, "checks_failed": 0, "compliance_percentage": 100.0},
+      {"control_id": "SC-28", "control_name": "Protection of Information at Rest", "control_family": "System and Communications Protection", "checks_total": 3, "checks_passed": 3, "checks_failed": 0, "compliance_percentage": 100.0}
+    ],
+    "family_summary": [
+      {"family": "Access Control", "controls": 3, "checks_passed": 10, "checks_total": 12, "compliance_percentage": 83.3},
+      {"family": "Audit and Accountability", "controls": 2, "checks_passed": 4, "checks_total": 4, "compliance_percentage": 100.0},
+      {"family": "Configuration Management", "controls": 1, "checks_passed": 13, "checks_total": 15, "compliance_percentage": 86.7},
+      {"family": "Identification and Authentication", "controls": 2, "checks_passed": 10, "checks_total": 10, "compliance_percentage": 100.0},
+      {"family": "System and Communications Protection", "controls": 3, "checks_passed": 10, "checks_total": 12, "compliance_percentage": 83.3}
+    ]
+  },
+  "recommendations": [
+    {
+      "priority": "critical",
+      "check_id": "NET-007",
+      "check_name": "Ensure firewall is active",
+      "category": "network",
+      "current_state": "ufw: False, firewalld: False, iptables rules: False",
+      "expected_state": "At least one firewall should be active",
+      "remediation": "Enable ufw: sudo ufw enable",
+      "nist_controls": ["SC-7", "AC-4"]
+    }
+  ]
+}
