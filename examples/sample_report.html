@@ -3,254 +3,1355 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Compliance Scan Report - Sample</title>
+    <title>Compliance Scan Report - ubuntu2204-lab - 2026-11-17T23:33:29Z</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #333; line-height: 1.6; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f7fa; color: #333; line-height: 1.6;
+        }
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%); color: white; padding: 40px; border-radius: 10px; margin-bottom: 30px; }
+        .header {
+            background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+            color: white; padding: 40px; border-radius: 10px; margin-bottom: 30px;
+        }
         .header h1 { font-size: 2rem; margin-bottom: 10px; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .stat-card { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); text-align: center; }
-        .stat-value { font-size: 2.5rem; font-weight: bold; }
-        .stat-pass { color: #48bb78; }
-        .stat-fail { color: #f56565; }
-        .stat-rate { color: #4299e1; }
-        .section { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 30px; }
-        .section h2 { font-size: 1.3rem; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #edf2f7; }
+        .header .subtitle { opacity: 0.9; font-size: 1.1rem; }
+        .header-meta { margin-top: 20px; opacity: 0.9; }
+        .header-meta p { margin: 4px 0; }
+        .notice {
+            background: #fffaf0; border-left: 4px solid #dd6b20; padding: 14px 18px;
+            border-radius: 0 8px 8px 0; margin-bottom: 24px; color: #7b341e;
+        }
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px; margin-bottom: 30px;
+        }
+        .stat-card { background: white; padding: 20px; border-radius: 10px; text-align: center;
+                     box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .stat-value { font-size: 2.1rem; font-weight: bold; }
+        .stat-label { color: #666; margin-top: 4px; font-size: 0.9rem; }
+        .stat-pass { color: #2f855a; } .stat-fail { color: #c53030; } .stat-rate { color: #2b6cb0; }
+        .stat-other { color: #975a16; }
+        .section { background: white; border-radius: 10px; padding: 25px; margin-bottom: 30px;
+                   box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .section h2 { font-size: 1.3rem; margin-bottom: 16px; padding-bottom: 10px;
+                      border-bottom: 2px solid #edf2f7; color: #2d3748; }
+        .section p.lead { color: #4a5568; margin-bottom: 14px; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #edf2f7; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #edf2f7; vertical-align: top; }
         th { background: #f7fafc; font-weight: 600; color: #4a5568; }
-        .badge { padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 500; }
-        .badge-pass { background: #c6f6d5; color: #276749; }
-        .badge-fail { background: #fed7d7; color: #c53030; }
-        .severity { padding: 3px 10px; border-radius: 4px; font-size: 0.8rem; }
-        .severity-critical { background: #c53030; color: white; }
-        .severity-high { background: #ed8936; color: white; }
-        .severity-medium { background: #ecc94b; color: #744210; }
-        .nist-tag { display: inline-block; background: #ebf8ff; color: #2b6cb0; padding: 2px 8px; border-radius: 4px; margin: 2px; font-size: 0.8rem; }
-        .check-details { padding: 15px; background: #f7fafc; border-radius: 5px; margin-top: 10px; }
-        .remediation { background: #fffaf0; border-left: 4px solid #ed8936; padding: 10px 15px; }
+        .badge { padding: 3px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
+                 display: inline-block; white-space: nowrap; }
+        .badge-pass { background: #c6f6d5; color: #22543d; }
+        .badge-fail { background: #fed7d7; color: #9b2c2c; }
+        .badge-error { background: #feebc8; color: #9c4221; }
+        .badge-not_applicable { background: #e2e8f0; color: #2d3748; }
+        .badge-manual { background: #bee3f8; color: #2a4365; }
+        .severity { padding: 2px 9px; border-radius: 4px; font-size: 0.78rem; font-weight: 600;
+                    display: inline-block; }
+        .severity-critical { background: #9b2c2c; color: white; }
+        .severity-high { background: #c05621; color: white; }
+        .severity-medium { background: #ecc94b; color: #5f370e; }
+        .severity-low { background: #718096; color: white; }
+        .cis-id { font-size: 11px; color: #4a5568; white-space: nowrap; }
+        .tag { display: inline-block; background: #ebf8ff; color: #2a4365; padding: 1px 7px;
+               border-radius: 4px; margin: 1px; font-size: 0.78rem; font-weight: 500; }
+        .detail { margin-top: 8px; padding: 10px 12px; background: #f7fafc; border-radius: 5px;
+                  border-left: 3px solid #cbd5e0; font-size: 0.92rem; color: #4a5568; }
+        .detail strong { color: #2d3748; }
         .progress-bar { height: 8px; background: #edf2f7; border-radius: 4px; overflow: hidden; }
-        .progress-fill { height: 100%; background: #48bb78; }
-        .footer { text-align: center; color: #a0aec0; padding: 20px; font-size: 0.9rem; }
+        .progress-fill { height: 100%; background: #38a169; }
+        .progress-fill.warning { background: #d69e2e; }
+        .progress-fill.danger { background: #e53e3e; }
+        .footer { text-align: center; color: #718096; padding: 24px 20px; font-size: 0.9rem; }
+        code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 0.88rem; }
+        @media print {
+            body { background: white; }
+            .section, .stat-card { box-shadow: none; border: 1px solid #edf2f7; }
+            .header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .stats-grid { grid-template-columns: repeat(4, 1fr); }
+            tr { break-inside: avoid; }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Compliance Scan Report</h1>
-            <p>CIS Benchmark Assessment with NIST 800-53 Control Mapping</p>
-            <p style="margin-top: 15px; opacity: 0.8;">
-                <strong>Host:</strong> web-server-01 |
-                <strong>OS:</strong> Ubuntu 22.04.3 LTS |
-                <strong>Scan Date:</strong> 2024-01-15 14:30:00
-            </p>
-        </div>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value">42</div>
-                <div class="stat-label">Total Checks</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value stat-pass">35</div>
-                <div class="stat-label">Passed</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value stat-fail">7</div>
-                <div class="stat-label">Failed</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value stat-rate">83.3%</div>
-                <div class="stat-label">Compliance Rate</div>
-                <div class="progress-bar" style="margin-top: 10px;">
-                    <div class="progress-fill" style="width: 83.3%;"></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="section">
-            <h2>NIST 800-53 Control Coverage</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Control</th>
-                        <th>Family</th>
-                        <th>Description</th>
-                        <th>Checks</th>
-                        <th>Compliance</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>AC-6</strong></td>
-                        <td>Access Control</td>
-                        <td>Least Privilege</td>
-                        <td>7/8</td>
-                        <td>87.5%</td>
-                    </tr>
-                    <tr>
-                        <td><strong>CM-7</strong></td>
-                        <td>Configuration Management</td>
-                        <td>Least Functionality</td>
-                        <td>13/15</td>
-                        <td>86.7%</td>
-                    </tr>
-                    <tr>
-                        <td><strong>SC-7</strong></td>
-                        <td>System and Communications Protection</td>
-                        <td>Boundary Protection</td>
-                        <td>5/7</td>
-                        <td>71.4%</td>
-                    </tr>
-                    <tr>
-                        <td><strong>IA-5</strong></td>
-                        <td>Identification and Authentication</td>
-                        <td>Authenticator Management</td>
-                        <td>6/6</td>
-                        <td>100.0%</td>
-                    </tr>
-                    <tr>
-                        <td><strong>AU-2</strong></td>
-                        <td>Audit and Accountability</td>
-                        <td>Audit Events</td>
-                        <td>2/2</td>
-                        <td>100.0%</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="section">
-            <h2>Authentication</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 80px;">ID</th>
-                        <th>Check</th>
-                        <th style="width: 90px;">Severity</th>
-                        <th style="width: 80px;">Status</th>
-                        <th style="width: 150px;">NIST Controls</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><code>AUTH-007</code></td>
-                        <td><strong>Ensure SSH root login is disabled</strong></td>
-                        <td><span class="severity severity-critical">CRITICAL</span></td>
-                        <td><span class="badge badge-pass">PASS</span></td>
-                        <td>
-                            <span class="nist-tag">AC-6</span>
-                            <span class="nist-tag">AC-17</span>
-                            <span class="nist-tag">IA-2</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td><code>AUTH-008</code></td>
-                        <td><strong>Ensure SSH PermitEmptyPasswords is disabled</strong></td>
-                        <td><span class="severity severity-critical">CRITICAL</span></td>
-                        <td><span class="badge badge-pass">PASS</span></td>
-                        <td>
-                            <span class="nist-tag">IA-5</span>
-                            <span class="nist-tag">IA-2</span>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="section">
-            <h2>Network</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 80px;">ID</th>
-                        <th>Check</th>
-                        <th style="width: 90px;">Severity</th>
-                        <th style="width: 80px;">Status</th>
-                        <th style="width: 150px;">NIST Controls</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><code>NET-007</code></td>
-                        <td>
-                            <strong>Ensure firewall is active</strong>
-                            <div class="check-details">
-                                <dl>
-                                    <dt>Current State:</dt>
-                                    <dd>ufw: False, firewalld: False, iptables rules: False</dd>
-                                    <dt>Expected:</dt>
-                                    <dd>At least one firewall should be active</dd>
-                                    <dt>Remediation:</dt>
-                                    <dd class="remediation">Enable ufw: sudo ufw enable</dd>
-                                </dl>
-                            </div>
-                        </td>
-                        <td><span class="severity severity-critical">CRITICAL</span></td>
-                        <td><span class="badge badge-fail">FAIL</span></td>
-                        <td>
-                            <span class="nist-tag">SC-7</span>
-                            <span class="nist-tag">AC-4</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td><code>NET-006</code></td>
-                        <td><strong>Ensure TCP SYN Cookies are enabled</strong></td>
-                        <td><span class="severity severity-high">HIGH</span></td>
-                        <td><span class="badge badge-pass">PASS</span></td>
-                        <td>
-                            <span class="nist-tag">SC-5</span>
-                            <span class="nist-tag">SC-7</span>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="section">
-            <h2>Services</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 80px;">ID</th>
-                        <th>Check</th>
-                        <th style="width: 90px;">Severity</th>
-                        <th style="width: 80px;">Status</th>
-                        <th style="width: 150px;">NIST Controls</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><code>SVC-002</code></td>
-                        <td><strong>Ensure telnet server is not installed</strong></td>
-                        <td><span class="severity severity-critical">CRITICAL</span></td>
-                        <td><span class="badge badge-pass">PASS</span></td>
-                        <td>
-                            <span class="nist-tag">CM-7</span>
-                            <span class="nist-tag">SC-8</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td><code>SVC-003</code></td>
-                        <td><strong>Ensure FTP server is not installed</strong></td>
-                        <td><span class="severity severity-high">HIGH</span></td>
-                        <td><span class="badge badge-pass">PASS</span></td>
-                        <td>
-                            <span class="nist-tag">CM-7</span>
-                            <span class="nist-tag">SC-8</span>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="footer">
-            <p>Generated by <strong>Automated Compliance Scanner v1.0.0</strong></p>
-            <p>Based on CIS Benchmarks with NIST 800-53 Rev 5 Control Mapping</p>
-            <p style="margin-top: 10px;">Author: Rayshaun Smith | <a href="https://github.com/RaySmith414">GitHub</a></p>
+<div class="container">
+    <div class="header">
+        <h1>Compliance Scan Report</h1>
+        <p class="subtitle">CIS Benchmarks for Ubuntu Linux, mapped to NIST SP 800-53 Rev. 5, SOC 2 and ISO/IEC 27001:2022</p>
+        <div class="header-meta">
+            <p><strong>Host:</strong> ubuntu2204-lab</p>
+            <p><strong>Operating system:</strong> Ubuntu 22.04 LTS (x86_64)</p>
+            <p><strong>Kernel:</strong> 6.18.44-fc-v553</p>
+            <p><strong>Scan time (UTC):</strong> 2026-11-17T23:33:29Z</p>
+            <p><strong>Scanner:</strong> Automated Compliance Scanner 2.0.0</p>
         </div>
     </div>
+
+    
+
+    <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value">41</div><div class="stat-label">Checks run</div></div>
+        <div class="stat-card"><div class="stat-value stat-pass">34</div><div class="stat-label">Passed</div></div>
+        <div class="stat-card"><div class="stat-value stat-fail">5</div><div class="stat-label">Failed</div></div>
+        <div class="stat-card"><div class="stat-value stat-other">0</div><div class="stat-label">Not assessed (error)</div></div>
+        <div class="stat-card"><div class="stat-value stat-other">1</div><div class="stat-label">Manual review</div></div>
+        <div class="stat-card"><div class="stat-value">1</div><div class="stat-label">Not applicable</div></div>
+        <div class="stat-card">
+            <div class="stat-value stat-rate">87.2%</div>
+            <div class="stat-label">Compliance rate (pass / assessed)</div>
+            
+            <div class="progress-bar" style="margin-top: 10px;">
+                <div class="progress-fill " style="width: 87.2%;"></div>
+            </div>
+            
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Summary</h2>
+        <p class="lead">39 of 41 checks produced a verdict.
+        1 critical and 0 high severity checks failed.</p>
+    </div>
+
+    
+    
+    
+    <div class="section">
+        <h2>NIST SP 800-53 Rev. 5: control coverage</h2>
+        <table>
+            <thead><tr><th>Control</th><th>Name</th><th>Passed</th><th>Failed</th><th>No verdict</th><th>Compliance</th></tr></thead>
+            <tbody>
+            
+            <tr>
+                <td><strong>AC-2</strong></td>
+                <td>Account Management</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>AC-3</strong></td>
+                <td>Access Enforcement</td>
+                <td>5</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>AC-4</strong></td>
+                <td>Information Flow Enforcement</td>
+                <td>0</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>AC-6</strong></td>
+                <td>Least Privilege</td>
+                <td>8</td>
+                <td>0</td>
+                <td>2</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>AC-7</strong></td>
+                <td>Unsuccessful Logon Attempts</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>AC-17</strong></td>
+                <td>Remote Access</td>
+                <td>3</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>AU-2</strong></td>
+                <td>Event Logging</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>AU-4</strong></td>
+                <td>Audit Log Storage Capacity</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>AU-9</strong></td>
+                <td>Protection of Audit Information</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>AU-11</strong></td>
+                <td>Audit Record Retention</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>AU-12</strong></td>
+                <td>Audit Record Generation</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>CM-6</strong></td>
+                <td>Configuration Settings</td>
+                <td>9</td>
+                <td>4</td>
+                <td>0</td>
+                <td>69.2%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>CM-7</strong></td>
+                <td>Least Functionality</td>
+                <td>10</td>
+                <td>1</td>
+                <td>0</td>
+                <td>90.9%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>IA-2</strong></td>
+                <td>Identification and Authentication (Organizational Users)</td>
+                <td>2</td>
+                <td>0</td>
+                <td>1</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>IA-5</strong></td>
+                <td>Authenticator Management</td>
+                <td>7</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>SC-5</strong></td>
+                <td>Denial-of-service Protection</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>SC-7</strong></td>
+                <td>Boundary Protection</td>
+                <td>1</td>
+                <td>4</td>
+                <td>0</td>
+                <td>20.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>SC-8</strong></td>
+                <td>Transmission Confidentiality and Integrity</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            </tbody>
+        </table>
+    </div>
+    
+    
+    
+    
+    <div class="section">
+        <h2>SOC 2 Trust Services Criteria (2017, common criteria): control coverage</h2>
+        <table>
+            <thead><tr><th>Control</th><th>Name</th><th>Passed</th><th>Failed</th><th>No verdict</th><th>Compliance</th></tr></thead>
+            <tbody>
+            
+            <tr>
+                <td><strong>CC6.1</strong></td>
+                <td>Logical access security over protected information assets</td>
+                <td>13</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>CC6.2</strong></td>
+                <td>Registration and removal of user access</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>CC6.3</strong></td>
+                <td>Role-based access and least privilege</td>
+                <td>6</td>
+                <td>0</td>
+                <td>2</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>CC6.6</strong></td>
+                <td>Protection against threats from outside the system boundary</td>
+                <td>6</td>
+                <td>4</td>
+                <td>0</td>
+                <td>60.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>CC6.7</strong></td>
+                <td>Protection of information in transmission</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>CC6.8</strong></td>
+                <td>Prevention and detection of unauthorized or malicious software</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>CC7.1</strong></td>
+                <td>Configuration standards and detection of configuration changes</td>
+                <td>12</td>
+                <td>1</td>
+                <td>0</td>
+                <td>92.3%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>CC7.2</strong></td>
+                <td>Monitoring of system components for anomalies</td>
+                <td>5</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            </tbody>
+        </table>
+    </div>
+    
+    
+    
+    
+    <div class="section">
+        <h2>ISO/IEC 27001:2022 Annex A: control coverage</h2>
+        <table>
+            <thead><tr><th>Control</th><th>Name</th><th>Passed</th><th>Failed</th><th>No verdict</th><th>Compliance</th></tr></thead>
+            <tbody>
+            
+            <tr>
+                <td><strong>A.5.17</strong></td>
+                <td>Authentication information</td>
+                <td>4</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>A.5.18</strong></td>
+                <td>Access rights</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>A.8.2</strong></td>
+                <td>Privileged access rights</td>
+                <td>3</td>
+                <td>0</td>
+                <td>2</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>A.8.3</strong></td>
+                <td>Information access restriction</td>
+                <td>6</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>A.8.5</strong></td>
+                <td>Secure authentication</td>
+                <td>4</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>A.8.9</strong></td>
+                <td>Configuration management</td>
+                <td>12</td>
+                <td>1</td>
+                <td>0</td>
+                <td>92.3%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>A.8.15</strong></td>
+                <td>Logging</td>
+                <td>5</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>A.8.18</strong></td>
+                <td>Use of privileged utility programs</td>
+                <td>0</td>
+                <td>0</td>
+                <td>1</td>
+                <td>n/a</td>
+            </tr>
+            
+            <tr>
+                <td><strong>A.8.20</strong></td>
+                <td>Networks security</td>
+                <td>3</td>
+                <td>4</td>
+                <td>0</td>
+                <td>42.9%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>A.8.21</strong></td>
+                <td>Security of network services</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>100.0%</td>
+            </tr>
+            
+            <tr>
+                <td><strong>A.8.22</strong></td>
+                <td>Segregation of networks</td>
+                <td>1</td>
+                <td>1</td>
+                <td>0</td>
+                <td>50.0%</td>
+            </tr>
+            
+            </tbody>
+        </table>
+    </div>
+    
+    
+
+    
+    <div class="section">
+        <h2>Filesystem</h2>
+        <table>
+            <thead><tr>
+                <th style="width: 120px;">ID</th><th>Check</th><th style="width: 90px;">Severity</th>
+                <th style="width: 130px;">Status</th><th style="width: 220px;">Mapped controls</th>
+            </tr></thead>
+            <tbody>
+            
+            <tr>
+                <td><code>LNX-FS-001</code></td>
+                <td>
+                    <strong>Ensure mounting of cramfs filesystems is disabled</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> cramfs is not built in and this kernel has no loadable module support<br>
+                        <strong>Expected:</strong> The cramfs kernel module is not loaded and cannot be loaded
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-high">HIGH</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">CM-7</span><span class="tag">CM-6</span>
+                    <span class="tag">CC7.1</span>
+                    <span class="tag">A.8.9</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-FS-002</code></td>
+                <td>
+                    <strong>Ensure mounting of squashfs filesystems is disabled</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> squashfs is available in the running kernel (listed in /proc/filesystems)<br>
+                        <strong>Expected:</strong> The squashfs kernel module is not loaded and cannot be loaded
+                        <br><strong>Remediation:</strong> Create /etc/modprobe.d/squashfs.conf containing &#34;install squashfs /bin/false&#34; and &#34;blacklist squashfs&#34;. Do not apply this on hosts that use snap packages.
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-fail">FAIL</span></td>
+                <td>
+                    <span class="tag">CM-7</span><span class="tag">CM-6</span>
+                    <span class="tag">CC7.1</span>
+                    <span class="tag">A.8.9</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-FS-003</code></td>
+                <td>
+                    <strong>Ensure mounting of udf filesystems is disabled</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> udf is not built in and this kernel has no loadable module support<br>
+                        <strong>Expected:</strong> The udf kernel module is not loaded and cannot be loaded
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-low">LOW</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">CM-7</span><span class="tag">CM-6</span>
+                    <span class="tag">CC7.1</span>
+                    <span class="tag">A.8.9</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-FS-004</code></td>
+                <td>
+                    <strong>Ensure /tmp is a separate partition</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> /tmp is a separate tmpfs mount<br>
+                        <strong>Expected:</strong> /tmp is its own mount point
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-high">HIGH</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">CM-6</span>
+                    <span class="tag">CC7.1</span>
+                    <span class="tag">A.8.9</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-FS-005</code></td>
+                <td>
+                    <strong>Ensure noexec option set on /tmp partition</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> /tmp mount options: nodev,noexec,nosuid,relatime,rw<br>
+                        <strong>Expected:</strong> /tmp is mounted with the noexec option
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-high">HIGH</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">CM-7</span><span class="tag">CM-6</span>
+                    <span class="tag">CC6.8</span><span class="tag">CC7.1</span>
+                    <span class="tag">A.8.9</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-FS-006</code></td>
+                <td>
+                    <strong>Ensure nodev option set on /tmp partition</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> /tmp mount options: nodev,noexec,nosuid,relatime,rw<br>
+                        <strong>Expected:</strong> /tmp is mounted with the nodev option
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">CM-6</span>
+                    <span class="tag">CC7.1</span>
+                    <span class="tag">A.8.9</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-FS-007</code></td>
+                <td>
+                    <strong>Ensure nosuid option set on /tmp partition</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> /tmp mount options: nodev,noexec,nosuid,relatime,rw<br>
+                        <strong>Expected:</strong> /tmp is mounted with the nosuid option
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">AC-6</span><span class="tag">CM-6</span>
+                    <span class="tag">CC6.3</span><span class="tag">CC7.1</span>
+                    <span class="tag">A.8.2</span><span class="tag">A.8.9</span>
+                </td>
+            </tr>
+            
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>Authentication</h2>
+        <table>
+            <thead><tr>
+                <th style="width: 120px;">ID</th><th>Check</th><th style="width: 90px;">Severity</th>
+                <th style="width: 130px;">Status</th><th style="width: 220px;">Mapped controls</th>
+            </tr></thead>
+            <tbody>
+            
+            <tr>
+                <td><code>LNX-AUTH-001</code></td>
+                <td>
+                    <strong>Ensure password expiration is 365 days or less</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> PASS_MAX_DAYS = 365<br>
+                        <strong>Expected:</strong> PASS_MAX_DAYS in /etc/login.defs is between 1 and 365
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-high">HIGH</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">IA-5</span>
+                    <span class="tag">CC6.1</span>
+                    <span class="tag">A.5.17</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-AUTH-002</code></td>
+                <td>
+                    <strong>Ensure minimum days between password changes is configured</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> PASS_MIN_DAYS = 1<br>
+                        <strong>Expected:</strong> PASS_MIN_DAYS in /etc/login.defs is 1 or more
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">IA-5</span>
+                    <span class="tag">CC6.1</span>
+                    <span class="tag">A.5.17</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-AUTH-003</code></td>
+                <td>
+                    <strong>Ensure password expiration warning days is 7 or more</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> PASS_WARN_AGE = 7<br>
+                        <strong>Expected:</strong> PASS_WARN_AGE in /etc/login.defs is 7 or more
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-low">LOW</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">IA-5</span>
+                    <span class="tag">CC6.1</span>
+                    <span class="tag">A.5.17</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-AUTH-004</code></td>
+                <td>
+                    <strong>Ensure inactive password lock is 30 days or less</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> INACTIVE = 30<br>
+                        <strong>Expected:</strong> The useradd default INACTIVE is between 0 and 30 days
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">AC-2</span><span class="tag">IA-5</span>
+                    <span class="tag">CC6.2</span>
+                    <span class="tag">A.5.18</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-AUTH-005</code></td>
+                <td>
+                    <strong>Ensure root is the only UID 0 account</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> root is the only UID 0 account<br>
+                        <strong>Expected:</strong> root is the only account with UID 0 in /etc/passwd
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-critical">CRITICAL</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">AC-6</span><span class="tag">AC-2</span>
+                    <span class="tag">CC6.3</span>
+                    <span class="tag">A.8.2</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-AUTH-006</code></td>
+                <td>
+                    <strong>Ensure root login is restricted to system console</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> pam_securetty is not enabled in /etc/pam.d/login, so /etc/securetty is not consulted on this host<br>
+                        <strong>Expected:</strong> Where pam_securetty is in use, /etc/securetty exists and lists only approved consoles
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-high">HIGH</span></td>
+                <td><span class="badge badge-not_applicable">NOT APPLICABLE</span></td>
+                <td>
+                    <span class="tag">AC-6</span><span class="tag">IA-2</span>
+                    <span class="tag">CC6.3</span>
+                    <span class="tag">A.8.2</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-AUTH-007</code></td>
+                <td>
+                    <strong>Ensure SSH root login is disabled</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> PermitRootLogin no<br>
+                        <strong>Expected:</strong> The effective sshd setting PermitRootLogin is &#34;no&#34;
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-critical">CRITICAL</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">AC-17</span><span class="tag">AC-6</span><span class="tag">IA-2</span>
+                    <span class="tag">CC6.1</span><span class="tag">CC6.6</span>
+                    <span class="tag">A.8.2</span><span class="tag">A.8.5</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-AUTH-008</code></td>
+                <td>
+                    <strong>Ensure SSH PermitEmptyPasswords is disabled</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> PermitEmptyPasswords no<br>
+                        <strong>Expected:</strong> The effective sshd setting PermitEmptyPasswords is &#34;no&#34;
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-critical">CRITICAL</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">IA-5</span><span class="tag">AC-17</span>
+                    <span class="tag">CC6.1</span><span class="tag">CC6.6</span>
+                    <span class="tag">A.8.5</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-AUTH-009</code></td>
+                <td>
+                    <strong>Review SSH PasswordAuthentication against site policy</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> PasswordAuthentication no<br>
+                        <strong>Expected:</strong> Password logins over SSH are either disabled or documented as an approved exception
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">IA-2</span><span class="tag">IA-5</span><span class="tag">AC-17</span>
+                    <span class="tag">CC6.1</span><span class="tag">CC6.6</span>
+                    <span class="tag">A.8.5</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-AUTH-010</code></td>
+                <td>
+                    <strong>Ensure SSH MaxAuthTries is set to 4 or less</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> MaxAuthTries 4<br>
+                        <strong>Expected:</strong> The effective sshd setting MaxAuthTries is 4 or less
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">AC-7</span>
+                    <span class="tag">CC6.1</span>
+                    <span class="tag">A.8.5</span>
+                </td>
+            </tr>
+            
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>Network</h2>
+        <table>
+            <thead><tr>
+                <th style="width: 120px;">ID</th><th>Check</th><th style="width: 90px;">Severity</th>
+                <th style="width: 130px;">Status</th><th style="width: 220px;">Mapped controls</th>
+            </tr></thead>
+            <tbody>
+            
+            <tr>
+                <td><code>LNX-NET-001</code></td>
+                <td>
+                    <strong>Ensure IP forwarding is disabled</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> net.ipv4.ip_forward = 0; IPv6 is not enabled<br>
+                        <strong>Expected:</strong> net.ipv4.ip_forward and net.ipv6.conf.all.forwarding are 0 in the running kernel
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-high">HIGH</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">SC-7</span><span class="tag">CM-7</span><span class="tag">CM-6</span>
+                    <span class="tag">CC6.6</span>
+                    <span class="tag">A.8.20</span><span class="tag">A.8.22</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-NET-002</code></td>
+                <td>
+                    <strong>Ensure packet redirect sending is disabled</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> net.ipv4.conf.all.send_redirects = 1, net.ipv4.conf.default.send_redirects = 1<br>
+                        <strong>Expected:</strong> net.ipv4.conf.all.send_redirects and net.ipv4.conf.default.send_redirects are 0
+                        <br><strong>Remediation:</strong> Set both send_redirects keys to 0 in a file under /etc/sysctl.d and run &#34;sysctl --system&#34;.
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-fail">FAIL</span></td>
+                <td>
+                    <span class="tag">SC-7</span><span class="tag">CM-6</span>
+                    <span class="tag">CC6.6</span>
+                    <span class="tag">A.8.20</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-NET-003</code></td>
+                <td>
+                    <strong>Ensure source routed packets are not accepted</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> net.ipv4.conf.all.accept_source_route = 0, net.ipv4.conf.default.accept_source_route = 1; IPv6 is not enabled<br>
+                        <strong>Expected:</strong> accept_source_route is 0 for &#34;all&#34; and &#34;default&#34; on IPv4 and on IPv6 where IPv6 is enabled
+                        <br><strong>Remediation:</strong> Set the accept_source_route keys to 0 in a file under /etc/sysctl.d and run &#34;sysctl --system&#34;.
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-fail">FAIL</span></td>
+                <td>
+                    <span class="tag">SC-7</span><span class="tag">CM-6</span>
+                    <span class="tag">CC6.6</span>
+                    <span class="tag">A.8.20</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-NET-004</code></td>
+                <td>
+                    <strong>Ensure ICMP redirects are not accepted</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> net.ipv4.conf.all.accept_redirects = 1, net.ipv4.conf.default.accept_redirects = 1; IPv6 is not enabled<br>
+                        <strong>Expected:</strong> accept_redirects is 0 for &#34;all&#34; and &#34;default&#34; on IPv4 and on IPv6 where IPv6 is enabled
+                        <br><strong>Remediation:</strong> Set the accept_redirects keys to 0 in a file under /etc/sysctl.d and run &#34;sysctl --system&#34;.
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-fail">FAIL</span></td>
+                <td>
+                    <span class="tag">SC-7</span><span class="tag">CM-6</span>
+                    <span class="tag">CC6.6</span>
+                    <span class="tag">A.8.20</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-NET-005</code></td>
+                <td>
+                    <strong>Ensure broadcast ICMP requests are ignored</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> net.ipv4.icmp_echo_ignore_broadcasts = 1<br>
+                        <strong>Expected:</strong> net.ipv4.icmp_echo_ignore_broadcasts is 1
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">SC-5</span><span class="tag">CM-6</span>
+                    <span class="tag">CC6.6</span>
+                    <span class="tag">A.8.20</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-NET-006</code></td>
+                <td>
+                    <strong>Ensure TCP SYN Cookies is enabled</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> net.ipv4.tcp_syncookies = 1<br>
+                        <strong>Expected:</strong> net.ipv4.tcp_syncookies is 1
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-high">HIGH</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">SC-5</span><span class="tag">CM-6</span>
+                    <span class="tag">CC6.6</span>
+                    <span class="tag">A.8.20</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-NET-007</code></td>
+                <td>
+                    <strong>Ensure a host firewall is active</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> iptables has no rules and accepts by default<br>
+                        <strong>Expected:</strong> ufw, firewalld, nftables or iptables is active with a filtering rule set
+                        <br><strong>Remediation:</strong> Enable one host firewall, for example &#34;ufw enable&#34; after allowing the services the host needs.
+                    </div>
+                </td>
+                <td><span class="severity severity-critical">CRITICAL</span></td>
+                <td><span class="badge badge-fail">FAIL</span></td>
+                <td>
+                    <span class="tag">SC-7</span><span class="tag">AC-4</span>
+                    <span class="tag">CC6.6</span>
+                    <span class="tag">A.8.20</span><span class="tag">A.8.22</span>
+                </td>
+            </tr>
+            
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>Logging</h2>
+        <table>
+            <thead><tr>
+                <th style="width: 120px;">ID</th><th>Check</th><th style="width: 90px;">Severity</th>
+                <th style="width: 130px;">Status</th><th style="width: 220px;">Mapped controls</th>
+            </tr></thead>
+            <tbody>
+            
+            <tr>
+                <td><code>LNX-LOG-001</code></td>
+                <td>
+                    <strong>Ensure rsyslog is installed</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> rsyslog is installed<br>
+                        <strong>Expected:</strong> The rsyslog package is installed
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-high">HIGH</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">AU-12</span><span class="tag">AU-2</span>
+                    <span class="tag">CC7.2</span>
+                    <span class="tag">A.8.15</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-LOG-002</code></td>
+                <td>
+                    <strong>Ensure rsyslog service is enabled</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> rsyslog unit state: enabled<br>
+                        <strong>Expected:</strong> The rsyslog unit is enabled
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-high">HIGH</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">AU-12</span>
+                    <span class="tag">CC7.2</span>
+                    <span class="tag">A.8.15</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-LOG-003</code></td>
+                <td>
+                    <strong>Ensure journald is configured to compress large log files</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> Compress=yes<br>
+                        <strong>Expected:</strong> Compress=yes is set in the journald configuration
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-low">LOW</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">AU-4</span>
+                    <span class="tag">CC7.2</span>
+                    <span class="tag">A.8.15</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-LOG-004</code></td>
+                <td>
+                    <strong>Ensure journald is configured to write logfiles to persistent disk</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> Storage=persistent<br>
+                        <strong>Expected:</strong> Storage=persistent is set in the journald configuration
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">AU-11</span><span class="tag">AU-4</span>
+                    <span class="tag">CC7.2</span>
+                    <span class="tag">A.8.15</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-LOG-005</code></td>
+                <td>
+                    <strong>Ensure permissions on /var/log are configured</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> mode 0775, owner root:syslog<br>
+                        <strong>Expected:</strong> /var/log is owned by root with group root, adm or syslog and is not writable by others
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">AU-9</span>
+                    <span class="tag">CC7.2</span><span class="tag">CC6.1</span>
+                    <span class="tag">A.8.15</span><span class="tag">A.8.3</span>
+                </td>
+            </tr>
+            
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>Access Control</h2>
+        <table>
+            <thead><tr>
+                <th style="width: 120px;">ID</th><th>Check</th><th style="width: 90px;">Severity</th>
+                <th style="width: 130px;">Status</th><th style="width: 220px;">Mapped controls</th>
+            </tr></thead>
+            <tbody>
+            
+            <tr>
+                <td><code>LNX-ACC-001</code></td>
+                <td>
+                    <strong>Ensure permissions on /etc/passwd are configured</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> mode 0644, owner root:root<br>
+                        <strong>Expected:</strong> /etc/passwd is owned by root:root with mode 0644 or more restrictive
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-high">HIGH</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">AC-3</span><span class="tag">AC-6</span>
+                    <span class="tag">CC6.1</span><span class="tag">CC6.3</span>
+                    <span class="tag">A.8.3</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-ACC-002</code></td>
+                <td>
+                    <strong>Ensure permissions on /etc/shadow are configured</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> mode 0640, owner root:shadow<br>
+                        <strong>Expected:</strong> /etc/shadow is owned by root, group root or shadow, with mode 0640 or more restrictive
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-critical">CRITICAL</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">AC-3</span><span class="tag">AC-6</span><span class="tag">IA-5</span>
+                    <span class="tag">CC6.1</span><span class="tag">CC6.3</span>
+                    <span class="tag">A.8.3</span><span class="tag">A.5.17</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-ACC-003</code></td>
+                <td>
+                    <strong>Ensure permissions on /etc/group are configured</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> mode 0644, owner root:root<br>
+                        <strong>Expected:</strong> /etc/group is owned by root:root with mode 0644 or more restrictive
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-high">HIGH</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">AC-3</span><span class="tag">AC-6</span>
+                    <span class="tag">CC6.1</span><span class="tag">CC6.3</span>
+                    <span class="tag">A.8.3</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-ACC-004</code></td>
+                <td>
+                    <strong>Ensure no world writable files exist</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> no world writable files on local file systems<br>
+                        <strong>Expected:</strong> No regular file on a local file system is writable by &#34;other&#34;
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-high">HIGH</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">AC-3</span><span class="tag">AC-6</span>
+                    <span class="tag">CC6.1</span><span class="tag">CC6.3</span>
+                    <span class="tag">A.8.3</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-ACC-005</code></td>
+                <td>
+                    <strong>Ensure no unowned or ungrouped files or directories exist</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> every file and directory on local file systems has an owner and a group<br>
+                        <strong>Expected:</strong> Every file and directory on a local file system has a known owner and group
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">AC-3</span><span class="tag">AC-6</span>
+                    <span class="tag">CC6.1</span>
+                    <span class="tag">A.8.3</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-ACC-006</code></td>
+                <td>
+                    <strong>Review SUID and SGID executables</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> 16 SUID or SGID files to compare with your baseline, for example: /usr/bin/chage, /usr/bin/chfn, /usr/bin/chsh, /usr/bin/crontab, /usr/bin/expiry (and 11 more)<br>
+                        <strong>Expected:</strong> Every SUID or SGID executable is known and justified
+                        <br><strong>Remediation:</strong> Compare the list with your approved baseline and remove the bit with &#34;chmod u-s,g-s &lt;file&gt;&#34; where it is not needed.
+                    </div>
+                </td>
+                <td><span class="severity severity-high">HIGH</span></td>
+                <td><span class="badge badge-manual">MANUAL</span></td>
+                <td>
+                    <span class="tag">AC-6</span>
+                    <span class="tag">CC6.3</span>
+                    <span class="tag">A.8.18</span><span class="tag">A.8.2</span>
+                </td>
+            </tr>
+            
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>Services</h2>
+        <table>
+            <thead><tr>
+                <th style="width: 120px;">ID</th><th>Check</th><th style="width: 90px;">Severity</th>
+                <th style="width: 130px;">Status</th><th style="width: 220px;">Mapped controls</th>
+            </tr></thead>
+            <tbody>
+            
+            <tr>
+                <td><code>LNX-SVC-001</code></td>
+                <td>
+                    <strong>Ensure xinetd is not installed</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> no xinetd package is installed<br>
+                        <strong>Expected:</strong> The xinetd package is not installed
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">CM-7</span>
+                    <span class="tag">CC7.1</span>
+                    <span class="tag">A.8.9</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-SVC-002</code></td>
+                <td>
+                    <strong>Ensure telnet server is not installed</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> no telnet server package is installed<br>
+                        <strong>Expected:</strong> No telnet server package is installed
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-critical">CRITICAL</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">CM-7</span><span class="tag">SC-8</span>
+                    <span class="tag">CC6.7</span><span class="tag">CC7.1</span>
+                    <span class="tag">A.8.21</span><span class="tag">A.8.9</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-SVC-003</code></td>
+                <td>
+                    <strong>Ensure FTP server is not installed</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> no FTP server package is installed<br>
+                        <strong>Expected:</strong> No FTP server package is installed
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-high">HIGH</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">CM-7</span><span class="tag">SC-8</span>
+                    <span class="tag">CC6.7</span><span class="tag">CC7.1</span>
+                    <span class="tag">A.8.21</span><span class="tag">A.8.9</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-SVC-004</code></td>
+                <td>
+                    <strong>Ensure HTTP server is not installed unless required</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> no web server package is installed<br>
+                        <strong>Expected:</strong> No web server package is installed unless the host is documented as needing one
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">CM-7</span>
+                    <span class="tag">CC7.1</span>
+                    <span class="tag">A.8.9</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-SVC-005</code></td>
+                <td>
+                    <strong>Ensure LDAP server is not installed unless required</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> no LDAP server package is installed<br>
+                        <strong>Expected:</strong> No LDAP server package is installed unless the host is documented as needing one
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">CM-7</span>
+                    <span class="tag">CC7.1</span>
+                    <span class="tag">A.8.9</span>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><code>LNX-SVC-006</code></td>
+                <td>
+                    <strong>Ensure NFS is not installed unless required</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> no NFS server package is installed<br>
+                        <strong>Expected:</strong> No NFS server package is installed unless the host is documented as needing one
+                        
+                    </div>
+                </td>
+                <td><span class="severity severity-medium">MEDIUM</span></td>
+                <td><span class="badge badge-pass">PASS</span></td>
+                <td>
+                    <span class="tag">CM-7</span>
+                    <span class="tag">CC7.1</span>
+                    <span class="tag">A.8.9</span>
+                </td>
+            </tr>
+            
+            </tbody>
+        </table>
+    </div>
+    
+
+    <div class="footer">
+        <p>Generated by Automated Compliance Scanner 2.0.0</p>
+        <p>Framework mappings are an informative crosswalk, not an official publication of NIST, the AICPA, ISO or CIS.</p>
+    </div>
+</div>
 </body>
 </html>

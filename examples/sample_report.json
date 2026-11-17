@@ -1,151 +1,2581 @@
 {
   "report_metadata": {
-    "generated_at": "2024-01-15T14:30:00.000000",
-    "scanner_version": "1.0.0",
-    "report_format": "compliance-scanner-v1",
-    "author": "Rayshaun Smith",
-    "tool": "Automated Compliance Scanner"
+    "report_format": "compliance-scanner-v2",
+    "tool": "Automated Compliance Scanner",
+    "scanner_version": "2.0.0",
+    "generated_at": "2026-11-17T23:33:29Z"
+  },
+  "platform": "linux",
+  "privileged": true,
+  "benchmark": {
+    "family": "CIS Benchmarks for Ubuntu Linux",
+    "written_against": "Ubuntu 22.04 LTS (also exercised on Ubuntu 24.04 LTS)",
+    "note": "Each check cites the CIS recommendation by title. Recommendation numbers change between benchmark versions, so cis_id is empty by default. Fill it in as a quoted string (for example \"1.1.1.1\") from the benchmark version your organization has adopted and it will appear in every report."
   },
   "system_info": {
-    "hostname": "web-server-01",
-    "kernel": "5.15.0-91-generic",
-    "distribution": "Ubuntu 22.04.3 LTS",
-    "architecture": "x86_64"
+    "hostname": "ubuntu2204-lab",
+    "platform": "linux",
+    "kernel": "6.18.44-fc-v553",
+    "architecture": "x86_64",
+    "distribution": "Ubuntu 22.04 LTS"
   },
   "summary": {
-    "total_checks": 42,
-    "passed": 35,
-    "failed": 7,
+    "total_checks": 41,
+    "passed": 34,
+    "failed": 5,
     "errors": 0,
-    "compliance_rate": 83.33,
-    "checks_by_severity": {
-      "critical": 8,
-      "high": 15,
-      "medium": 12,
-      "low": 7
-    },
+    "not_applicable": 1,
+    "manual": 1,
+    "assessed": 39,
+    "compliance_rate": 87.2,
     "failed_by_severity": {
       "critical": 1,
-      "high": 3,
-      "medium": 2,
-      "low": 1
-    },
-    "checks_by_category": {
-      "filesystem": {"total": 7, "passed": 5, "failed": 2},
-      "authentication": {"total": 10, "passed": 9, "failed": 1},
-      "network": {"total": 7, "passed": 5, "failed": 2},
-      "logging": {"total": 5, "passed": 5, "failed": 0},
-      "access_control": {"total": 6, "passed": 5, "failed": 1},
-      "services": {"total": 7, "passed": 6, "failed": 1}
-    },
-    "scan_timestamp": "2024-01-15T14:30:00.000000"
+      "high": 0,
+      "medium": 4,
+      "low": 0
+    }
   },
   "checks": [
     {
-      "id": "FS-001",
+      "id": "LNX-FS-001",
+      "title": "Ensure mounting of cramfs filesystems is disabled",
       "category": "filesystem",
-      "name": "Ensure mounting of cramfs is disabled",
       "severity": "high",
       "status": "PASS",
-      "actual": "Module disabled",
-      "expected": "cramfs module should be disabled",
-      "remediation": "Add \"install cramfs /bin/true\" to /etc/modprobe.d/cramfs.conf",
-      "nist_controls": [
-        {"control_id": "CM-7", "control_name": "Least Functionality", "control_family": "Configuration Management"},
-        {"control_id": "SC-28", "control_name": "Protection of Information at Rest", "control_family": "System and Communications Protection"}
-      ]
+      "actual": "cramfs is not built in and this kernel has no loadable module support",
+      "expected": "The cramfs kernel module is not loaded and cannot be loaded",
+      "remediation": "Create /etc/modprobe.d/cramfs.conf containing \"install cramfs /bin/false\" and \"blacklist cramfs\", then run \"modprobe -r cramfs\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "CM-7",
+            "control_name": "Least Functionality",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "CM-6",
+            "control_name": "Configuration Settings",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC7.1",
+            "control_name": "Configuration standards and detection of configuration changes"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.9",
+            "control_name": "Configuration management"
+          }
+        ]
+      }
     },
     {
-      "id": "AUTH-007",
+      "id": "LNX-FS-002",
+      "title": "Ensure mounting of squashfs filesystems is disabled",
+      "category": "filesystem",
+      "severity": "medium",
+      "status": "FAIL",
+      "actual": "squashfs is available in the running kernel (listed in /proc/filesystems)",
+      "expected": "The squashfs kernel module is not loaded and cannot be loaded",
+      "remediation": "Create /etc/modprobe.d/squashfs.conf containing \"install squashfs /bin/false\" and \"blacklist squashfs\". Do not apply this on hosts that use snap packages.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "CM-7",
+            "control_name": "Least Functionality",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "CM-6",
+            "control_name": "Configuration Settings",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC7.1",
+            "control_name": "Configuration standards and detection of configuration changes"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.9",
+            "control_name": "Configuration management"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-FS-003",
+      "title": "Ensure mounting of udf filesystems is disabled",
+      "category": "filesystem",
+      "severity": "low",
+      "status": "PASS",
+      "actual": "udf is not built in and this kernel has no loadable module support",
+      "expected": "The udf kernel module is not loaded and cannot be loaded",
+      "remediation": "Create /etc/modprobe.d/udf.conf containing \"install udf /bin/false\" and \"blacklist udf\", then run \"modprobe -r udf\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "CM-7",
+            "control_name": "Least Functionality",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "CM-6",
+            "control_name": "Configuration Settings",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC7.1",
+            "control_name": "Configuration standards and detection of configuration changes"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.9",
+            "control_name": "Configuration management"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-FS-004",
+      "title": "Ensure /tmp is a separate partition",
+      "category": "filesystem",
+      "severity": "high",
+      "status": "PASS",
+      "actual": "/tmp is a separate tmpfs mount",
+      "expected": "/tmp is its own mount point",
+      "remediation": "Mount /tmp as its own file system, for example with the systemd tmp.mount unit or an /etc/fstab entry.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "CM-6",
+            "control_name": "Configuration Settings",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC7.1",
+            "control_name": "Configuration standards and detection of configuration changes"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.9",
+            "control_name": "Configuration management"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-FS-005",
+      "title": "Ensure noexec option set on /tmp partition",
+      "category": "filesystem",
+      "severity": "high",
+      "status": "PASS",
+      "actual": "/tmp mount options: nodev,noexec,nosuid,relatime,rw",
+      "expected": "/tmp is mounted with the noexec option",
+      "remediation": "Add noexec to the mount options for /tmp in /etc/fstab or tmp.mount, then remount.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "CM-7",
+            "control_name": "Least Functionality",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "CM-6",
+            "control_name": "Configuration Settings",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.8",
+            "control_name": "Prevention and detection of unauthorized or malicious software"
+          },
+          {
+            "control_id": "CC7.1",
+            "control_name": "Configuration standards and detection of configuration changes"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.9",
+            "control_name": "Configuration management"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-FS-006",
+      "title": "Ensure nodev option set on /tmp partition",
+      "category": "filesystem",
+      "severity": "medium",
+      "status": "PASS",
+      "actual": "/tmp mount options: nodev,noexec,nosuid,relatime,rw",
+      "expected": "/tmp is mounted with the nodev option",
+      "remediation": "Add nodev to the mount options for /tmp in /etc/fstab or tmp.mount, then remount.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "CM-6",
+            "control_name": "Configuration Settings",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC7.1",
+            "control_name": "Configuration standards and detection of configuration changes"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.9",
+            "control_name": "Configuration management"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-FS-007",
+      "title": "Ensure nosuid option set on /tmp partition",
+      "category": "filesystem",
+      "severity": "medium",
+      "status": "PASS",
+      "actual": "/tmp mount options: nodev,noexec,nosuid,relatime,rw",
+      "expected": "/tmp is mounted with the nosuid option",
+      "remediation": "Add nosuid to the mount options for /tmp in /etc/fstab or tmp.mount, then remount.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AC-6",
+            "control_name": "Least Privilege",
+            "control_family": "Access Control",
+            "baselines": [
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "CM-6",
+            "control_name": "Configuration Settings",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.3",
+            "control_name": "Role-based access and least privilege"
+          },
+          {
+            "control_id": "CC7.1",
+            "control_name": "Configuration standards and detection of configuration changes"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.2",
+            "control_name": "Privileged access rights"
+          },
+          {
+            "control_id": "A.8.9",
+            "control_name": "Configuration management"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-AUTH-001",
+      "title": "Ensure password expiration is 365 days or less",
       "category": "authentication",
-      "name": "Ensure SSH root login is disabled",
+      "severity": "high",
+      "status": "PASS",
+      "actual": "PASS_MAX_DAYS = 365",
+      "expected": "PASS_MAX_DAYS in /etc/login.defs is between 1 and 365",
+      "remediation": "Set PASS_MAX_DAYS to 365 or less in /etc/login.defs and run \"chage --maxdays 365 <user>\" for existing accounts.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "IA-5",
+            "control_name": "Authenticator Management",
+            "control_family": "Identification and Authentication",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.1",
+            "control_name": "Logical access security over protected information assets"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.5.17",
+            "control_name": "Authentication information"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-AUTH-002",
+      "title": "Ensure minimum days between password changes is configured",
+      "category": "authentication",
+      "severity": "medium",
+      "status": "PASS",
+      "actual": "PASS_MIN_DAYS = 1",
+      "expected": "PASS_MIN_DAYS in /etc/login.defs is 1 or more",
+      "remediation": "Set PASS_MIN_DAYS to 1 or more in /etc/login.defs and run \"chage --mindays 1 <user>\" for existing accounts.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "IA-5",
+            "control_name": "Authenticator Management",
+            "control_family": "Identification and Authentication",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.1",
+            "control_name": "Logical access security over protected information assets"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.5.17",
+            "control_name": "Authentication information"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-AUTH-003",
+      "title": "Ensure password expiration warning days is 7 or more",
+      "category": "authentication",
+      "severity": "low",
+      "status": "PASS",
+      "actual": "PASS_WARN_AGE = 7",
+      "expected": "PASS_WARN_AGE in /etc/login.defs is 7 or more",
+      "remediation": "Set PASS_WARN_AGE to 7 or more in /etc/login.defs.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "IA-5",
+            "control_name": "Authenticator Management",
+            "control_family": "Identification and Authentication",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.1",
+            "control_name": "Logical access security over protected information assets"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.5.17",
+            "control_name": "Authentication information"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-AUTH-004",
+      "title": "Ensure inactive password lock is 30 days or less",
+      "category": "authentication",
+      "severity": "medium",
+      "status": "PASS",
+      "actual": "INACTIVE = 30",
+      "expected": "The useradd default INACTIVE is between 0 and 30 days",
+      "remediation": "Run \"useradd -D -f 30\" and \"chage --inactive 30 <user>\" for existing accounts.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AC-2",
+            "control_name": "Account Management",
+            "control_family": "Access Control",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "IA-5",
+            "control_name": "Authenticator Management",
+            "control_family": "Identification and Authentication",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.2",
+            "control_name": "Registration and removal of user access"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.5.18",
+            "control_name": "Access rights"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-AUTH-005",
+      "title": "Ensure root is the only UID 0 account",
+      "category": "authentication",
       "severity": "critical",
       "status": "PASS",
-      "actual": "permitrootlogin no",
-      "expected": "PermitRootLogin no",
-      "remediation": "Set PermitRootLogin no in /etc/ssh/sshd_config",
-      "nist_controls": [
-        {"control_id": "AC-6", "control_name": "Least Privilege", "control_family": "Access Control"},
-        {"control_id": "AC-17", "control_name": "Remote Access", "control_family": "Access Control"},
-        {"control_id": "IA-2", "control_name": "Identification and Authentication (Organizational Users)", "control_family": "Identification and Authentication"}
-      ]
+      "actual": "root is the only UID 0 account",
+      "expected": "root is the only account with UID 0 in /etc/passwd",
+      "remediation": "Remove every other UID 0 account or give it a unique non-zero UID.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AC-6",
+            "control_name": "Least Privilege",
+            "control_family": "Access Control",
+            "baselines": [
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "AC-2",
+            "control_name": "Account Management",
+            "control_family": "Access Control",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.3",
+            "control_name": "Role-based access and least privilege"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.2",
+            "control_name": "Privileged access rights"
+          }
+        ]
+      }
     },
     {
-      "id": "NET-007",
+      "id": "LNX-AUTH-006",
+      "title": "Ensure root login is restricted to system console",
+      "category": "authentication",
+      "severity": "high",
+      "status": "NOT_APPLICABLE",
+      "actual": "pam_securetty is not enabled in /etc/pam.d/login, so /etc/securetty is not consulted on this host",
+      "expected": "Where pam_securetty is in use, /etc/securetty exists and lists only approved consoles",
+      "remediation": "Review /etc/securetty and remove every terminal that is not physically secured.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AC-6",
+            "control_name": "Least Privilege",
+            "control_family": "Access Control",
+            "baselines": [
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "IA-2",
+            "control_name": "Identification and Authentication (Organizational Users)",
+            "control_family": "Identification and Authentication",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.3",
+            "control_name": "Role-based access and least privilege"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.2",
+            "control_name": "Privileged access rights"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-AUTH-007",
+      "title": "Ensure SSH root login is disabled",
+      "category": "authentication",
+      "severity": "critical",
+      "status": "PASS",
+      "actual": "PermitRootLogin no",
+      "expected": "The effective sshd setting PermitRootLogin is \"no\"",
+      "remediation": "Set \"PermitRootLogin no\" in /etc/ssh/sshd_config or a drop-in file and reload sshd.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AC-17",
+            "control_name": "Remote Access",
+            "control_family": "Access Control",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "AC-6",
+            "control_name": "Least Privilege",
+            "control_family": "Access Control",
+            "baselines": [
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "IA-2",
+            "control_name": "Identification and Authentication (Organizational Users)",
+            "control_family": "Identification and Authentication",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.1",
+            "control_name": "Logical access security over protected information assets"
+          },
+          {
+            "control_id": "CC6.6",
+            "control_name": "Protection against threats from outside the system boundary"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.2",
+            "control_name": "Privileged access rights"
+          },
+          {
+            "control_id": "A.8.5",
+            "control_name": "Secure authentication"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-AUTH-008",
+      "title": "Ensure SSH PermitEmptyPasswords is disabled",
+      "category": "authentication",
+      "severity": "critical",
+      "status": "PASS",
+      "actual": "PermitEmptyPasswords no",
+      "expected": "The effective sshd setting PermitEmptyPasswords is \"no\"",
+      "remediation": "Set \"PermitEmptyPasswords no\" in /etc/ssh/sshd_config or a drop-in file and reload sshd.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "IA-5",
+            "control_name": "Authenticator Management",
+            "control_family": "Identification and Authentication",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "AC-17",
+            "control_name": "Remote Access",
+            "control_family": "Access Control",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.1",
+            "control_name": "Logical access security over protected information assets"
+          },
+          {
+            "control_id": "CC6.6",
+            "control_name": "Protection against threats from outside the system boundary"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.5",
+            "control_name": "Secure authentication"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-AUTH-009",
+      "title": "Review SSH PasswordAuthentication against site policy",
+      "category": "authentication",
+      "severity": "medium",
+      "status": "PASS",
+      "actual": "PasswordAuthentication no",
+      "expected": "Password logins over SSH are either disabled or documented as an approved exception",
+      "remediation": "Set \"PasswordAuthentication no\" and use keys or certificates, unless site policy documents a need for password logins.",
+      "cis": {
+        "is_cis_recommendation": false,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "IA-2",
+            "control_name": "Identification and Authentication (Organizational Users)",
+            "control_family": "Identification and Authentication",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "IA-5",
+            "control_name": "Authenticator Management",
+            "control_family": "Identification and Authentication",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "AC-17",
+            "control_name": "Remote Access",
+            "control_family": "Access Control",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.1",
+            "control_name": "Logical access security over protected information assets"
+          },
+          {
+            "control_id": "CC6.6",
+            "control_name": "Protection against threats from outside the system boundary"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.5",
+            "control_name": "Secure authentication"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-AUTH-010",
+      "title": "Ensure SSH MaxAuthTries is set to 4 or less",
+      "category": "authentication",
+      "severity": "medium",
+      "status": "PASS",
+      "actual": "MaxAuthTries 4",
+      "expected": "The effective sshd setting MaxAuthTries is 4 or less",
+      "remediation": "Set \"MaxAuthTries 4\" in /etc/ssh/sshd_config or a drop-in file and reload sshd.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AC-7",
+            "control_name": "Unsuccessful Logon Attempts",
+            "control_family": "Access Control",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.1",
+            "control_name": "Logical access security over protected information assets"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.5",
+            "control_name": "Secure authentication"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-NET-001",
+      "title": "Ensure IP forwarding is disabled",
       "category": "network",
-      "name": "Ensure firewall is active",
+      "severity": "high",
+      "status": "PASS",
+      "actual": "net.ipv4.ip_forward = 0; IPv6 is not enabled",
+      "expected": "net.ipv4.ip_forward and net.ipv6.conf.all.forwarding are 0 in the running kernel",
+      "remediation": "Set net.ipv4.ip_forward=0 and net.ipv6.conf.all.forwarding=0 in a file under /etc/sysctl.d and run \"sysctl --system\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "SC-7",
+            "control_name": "Boundary Protection",
+            "control_family": "System and Communications Protection",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "CM-7",
+            "control_name": "Least Functionality",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "CM-6",
+            "control_name": "Configuration Settings",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.6",
+            "control_name": "Protection against threats from outside the system boundary"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.20",
+            "control_name": "Networks security"
+          },
+          {
+            "control_id": "A.8.22",
+            "control_name": "Segregation of networks"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-NET-002",
+      "title": "Ensure packet redirect sending is disabled",
+      "category": "network",
+      "severity": "medium",
+      "status": "FAIL",
+      "actual": "net.ipv4.conf.all.send_redirects = 1, net.ipv4.conf.default.send_redirects = 1",
+      "expected": "net.ipv4.conf.all.send_redirects and net.ipv4.conf.default.send_redirects are 0",
+      "remediation": "Set both send_redirects keys to 0 in a file under /etc/sysctl.d and run \"sysctl --system\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "SC-7",
+            "control_name": "Boundary Protection",
+            "control_family": "System and Communications Protection",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "CM-6",
+            "control_name": "Configuration Settings",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.6",
+            "control_name": "Protection against threats from outside the system boundary"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.20",
+            "control_name": "Networks security"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-NET-003",
+      "title": "Ensure source routed packets are not accepted",
+      "category": "network",
+      "severity": "medium",
+      "status": "FAIL",
+      "actual": "net.ipv4.conf.all.accept_source_route = 0, net.ipv4.conf.default.accept_source_route = 1; IPv6 is not enabled",
+      "expected": "accept_source_route is 0 for \"all\" and \"default\" on IPv4 and on IPv6 where IPv6 is enabled",
+      "remediation": "Set the accept_source_route keys to 0 in a file under /etc/sysctl.d and run \"sysctl --system\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "SC-7",
+            "control_name": "Boundary Protection",
+            "control_family": "System and Communications Protection",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "CM-6",
+            "control_name": "Configuration Settings",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.6",
+            "control_name": "Protection against threats from outside the system boundary"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.20",
+            "control_name": "Networks security"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-NET-004",
+      "title": "Ensure ICMP redirects are not accepted",
+      "category": "network",
+      "severity": "medium",
+      "status": "FAIL",
+      "actual": "net.ipv4.conf.all.accept_redirects = 1, net.ipv4.conf.default.accept_redirects = 1; IPv6 is not enabled",
+      "expected": "accept_redirects is 0 for \"all\" and \"default\" on IPv4 and on IPv6 where IPv6 is enabled",
+      "remediation": "Set the accept_redirects keys to 0 in a file under /etc/sysctl.d and run \"sysctl --system\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "SC-7",
+            "control_name": "Boundary Protection",
+            "control_family": "System and Communications Protection",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "CM-6",
+            "control_name": "Configuration Settings",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.6",
+            "control_name": "Protection against threats from outside the system boundary"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.20",
+            "control_name": "Networks security"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-NET-005",
+      "title": "Ensure broadcast ICMP requests are ignored",
+      "category": "network",
+      "severity": "medium",
+      "status": "PASS",
+      "actual": "net.ipv4.icmp_echo_ignore_broadcasts = 1",
+      "expected": "net.ipv4.icmp_echo_ignore_broadcasts is 1",
+      "remediation": "Set net.ipv4.icmp_echo_ignore_broadcasts=1 in a file under /etc/sysctl.d and run \"sysctl --system\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "SC-5",
+            "control_name": "Denial-of-service Protection",
+            "control_family": "System and Communications Protection",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "CM-6",
+            "control_name": "Configuration Settings",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.6",
+            "control_name": "Protection against threats from outside the system boundary"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.20",
+            "control_name": "Networks security"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-NET-006",
+      "title": "Ensure TCP SYN Cookies is enabled",
+      "category": "network",
+      "severity": "high",
+      "status": "PASS",
+      "actual": "net.ipv4.tcp_syncookies = 1",
+      "expected": "net.ipv4.tcp_syncookies is 1",
+      "remediation": "Set net.ipv4.tcp_syncookies=1 in a file under /etc/sysctl.d and run \"sysctl --system\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "SC-5",
+            "control_name": "Denial-of-service Protection",
+            "control_family": "System and Communications Protection",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "CM-6",
+            "control_name": "Configuration Settings",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.6",
+            "control_name": "Protection against threats from outside the system boundary"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.20",
+            "control_name": "Networks security"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-NET-007",
+      "title": "Ensure a host firewall is active",
+      "category": "network",
       "severity": "critical",
       "status": "FAIL",
-      "actual": "ufw: False, firewalld: False, iptables rules: False",
-      "expected": "At least one firewall should be active",
-      "remediation": "Enable ufw: sudo ufw enable",
-      "nist_controls": [
-        {"control_id": "SC-7", "control_name": "Boundary Protection", "control_family": "System and Communications Protection"},
-        {"control_id": "AC-4", "control_name": "Information Flow Enforcement", "control_family": "Access Control"}
-      ]
+      "actual": "iptables has no rules and accepts by default",
+      "expected": "ufw, firewalld, nftables or iptables is active with a filtering rule set",
+      "remediation": "Enable one host firewall, for example \"ufw enable\" after allowing the services the host needs.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "SC-7",
+            "control_name": "Boundary Protection",
+            "control_family": "System and Communications Protection",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "AC-4",
+            "control_name": "Information Flow Enforcement",
+            "control_family": "Access Control",
+            "baselines": [
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.6",
+            "control_name": "Protection against threats from outside the system boundary"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.20",
+            "control_name": "Networks security"
+          },
+          {
+            "control_id": "A.8.22",
+            "control_name": "Segregation of networks"
+          }
+        ]
+      }
     },
     {
-      "id": "LOG-001",
+      "id": "LNX-LOG-001",
+      "title": "Ensure rsyslog is installed",
       "category": "logging",
-      "name": "Ensure rsyslog is installed",
       "severity": "high",
       "status": "PASS",
-      "actual": "rsyslog installed",
-      "expected": "rsyslog should be installed",
-      "remediation": "Install rsyslog: apt install rsyslog",
-      "nist_controls": [
-        {"control_id": "AU-2", "control_name": "Audit Events", "control_family": "Audit and Accountability"},
-        {"control_id": "AU-3", "control_name": "Content of Audit Records", "control_family": "Audit and Accountability"}
-      ]
+      "actual": "rsyslog is installed",
+      "expected": "The rsyslog package is installed",
+      "remediation": "Install rsyslog with \"apt install rsyslog\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AU-12",
+            "control_name": "Audit Record Generation",
+            "control_family": "Audit and Accountability",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "AU-2",
+            "control_name": "Event Logging",
+            "control_family": "Audit and Accountability",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC7.2",
+            "control_name": "Monitoring of system components for anomalies"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.15",
+            "control_name": "Logging"
+          }
+        ]
+      }
     },
     {
-      "id": "SVC-002",
-      "category": "services",
-      "name": "Ensure telnet server is not installed",
+      "id": "LNX-LOG-002",
+      "title": "Ensure rsyslog service is enabled",
+      "category": "logging",
+      "severity": "high",
+      "status": "PASS",
+      "actual": "rsyslog unit state: enabled",
+      "expected": "The rsyslog unit is enabled",
+      "remediation": "Run \"systemctl --now enable rsyslog\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AU-12",
+            "control_name": "Audit Record Generation",
+            "control_family": "Audit and Accountability",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC7.2",
+            "control_name": "Monitoring of system components for anomalies"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.15",
+            "control_name": "Logging"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-LOG-003",
+      "title": "Ensure journald is configured to compress large log files",
+      "category": "logging",
+      "severity": "low",
+      "status": "PASS",
+      "actual": "Compress=yes",
+      "expected": "Compress=yes is set in the journald configuration",
+      "remediation": "Set Compress=yes in /etc/systemd/journald.conf or a drop-in under /etc/systemd/journald.conf.d and restart systemd-journald.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AU-4",
+            "control_name": "Audit Log Storage Capacity",
+            "control_family": "Audit and Accountability",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC7.2",
+            "control_name": "Monitoring of system components for anomalies"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.15",
+            "control_name": "Logging"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-LOG-004",
+      "title": "Ensure journald is configured to write logfiles to persistent disk",
+      "category": "logging",
+      "severity": "medium",
+      "status": "PASS",
+      "actual": "Storage=persistent",
+      "expected": "Storage=persistent is set in the journald configuration",
+      "remediation": "Set Storage=persistent in /etc/systemd/journald.conf or a drop-in under /etc/systemd/journald.conf.d and restart systemd-journald.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AU-11",
+            "control_name": "Audit Record Retention",
+            "control_family": "Audit and Accountability",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "AU-4",
+            "control_name": "Audit Log Storage Capacity",
+            "control_family": "Audit and Accountability",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC7.2",
+            "control_name": "Monitoring of system components for anomalies"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.15",
+            "control_name": "Logging"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-LOG-005",
+      "title": "Ensure permissions on /var/log are configured",
+      "category": "logging",
+      "severity": "medium",
+      "status": "PASS",
+      "actual": "mode 0775, owner root:syslog",
+      "expected": "/var/log is owned by root with group root, adm or syslog and is not writable by others",
+      "remediation": "Run \"chown root /var/log\" and \"chmod o-w /var/log\".",
+      "cis": {
+        "is_cis_recommendation": false,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AU-9",
+            "control_name": "Protection of Audit Information",
+            "control_family": "Audit and Accountability",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC7.2",
+            "control_name": "Monitoring of system components for anomalies"
+          },
+          {
+            "control_id": "CC6.1",
+            "control_name": "Logical access security over protected information assets"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.15",
+            "control_name": "Logging"
+          },
+          {
+            "control_id": "A.8.3",
+            "control_name": "Information access restriction"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-ACC-001",
+      "title": "Ensure permissions on /etc/passwd are configured",
+      "category": "access_control",
+      "severity": "high",
+      "status": "PASS",
+      "actual": "mode 0644, owner root:root",
+      "expected": "/etc/passwd is owned by root:root with mode 0644 or more restrictive",
+      "remediation": "Run \"chown root:root /etc/passwd\" and \"chmod u-x,go-wx /etc/passwd\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AC-3",
+            "control_name": "Access Enforcement",
+            "control_family": "Access Control",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "AC-6",
+            "control_name": "Least Privilege",
+            "control_family": "Access Control",
+            "baselines": [
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.1",
+            "control_name": "Logical access security over protected information assets"
+          },
+          {
+            "control_id": "CC6.3",
+            "control_name": "Role-based access and least privilege"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.3",
+            "control_name": "Information access restriction"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-ACC-002",
+      "title": "Ensure permissions on /etc/shadow are configured",
+      "category": "access_control",
       "severity": "critical",
       "status": "PASS",
-      "actual": "telnet server not installed",
-      "expected": "telnet server should not be installed",
-      "remediation": "Remove telnet server: apt remove telnetd",
-      "nist_controls": [
-        {"control_id": "CM-7", "control_name": "Least Functionality", "control_family": "Configuration Management"},
-        {"control_id": "SC-8", "control_name": "Transmission Confidentiality and Integrity", "control_family": "System and Communications Protection"}
-      ]
+      "actual": "mode 0640, owner root:shadow",
+      "expected": "/etc/shadow is owned by root, group root or shadow, with mode 0640 or more restrictive",
+      "remediation": "Run \"chown root:shadow /etc/shadow\" and \"chmod u-x,g-wx,o-rwx /etc/shadow\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AC-3",
+            "control_name": "Access Enforcement",
+            "control_family": "Access Control",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "AC-6",
+            "control_name": "Least Privilege",
+            "control_family": "Access Control",
+            "baselines": [
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "IA-5",
+            "control_name": "Authenticator Management",
+            "control_family": "Identification and Authentication",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.1",
+            "control_name": "Logical access security over protected information assets"
+          },
+          {
+            "control_id": "CC6.3",
+            "control_name": "Role-based access and least privilege"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.3",
+            "control_name": "Information access restriction"
+          },
+          {
+            "control_id": "A.5.17",
+            "control_name": "Authentication information"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-ACC-003",
+      "title": "Ensure permissions on /etc/group are configured",
+      "category": "access_control",
+      "severity": "high",
+      "status": "PASS",
+      "actual": "mode 0644, owner root:root",
+      "expected": "/etc/group is owned by root:root with mode 0644 or more restrictive",
+      "remediation": "Run \"chown root:root /etc/group\" and \"chmod u-x,go-wx /etc/group\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AC-3",
+            "control_name": "Access Enforcement",
+            "control_family": "Access Control",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "AC-6",
+            "control_name": "Least Privilege",
+            "control_family": "Access Control",
+            "baselines": [
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.1",
+            "control_name": "Logical access security over protected information assets"
+          },
+          {
+            "control_id": "CC6.3",
+            "control_name": "Role-based access and least privilege"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.3",
+            "control_name": "Information access restriction"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-ACC-004",
+      "title": "Ensure no world writable files exist",
+      "category": "access_control",
+      "severity": "high",
+      "status": "PASS",
+      "actual": "no world writable files on local file systems",
+      "expected": "No regular file on a local file system is writable by \"other\"",
+      "remediation": "Review each file and run \"chmod o-w <file>\" where world write access is not required.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AC-3",
+            "control_name": "Access Enforcement",
+            "control_family": "Access Control",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "AC-6",
+            "control_name": "Least Privilege",
+            "control_family": "Access Control",
+            "baselines": [
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.1",
+            "control_name": "Logical access security over protected information assets"
+          },
+          {
+            "control_id": "CC6.3",
+            "control_name": "Role-based access and least privilege"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.3",
+            "control_name": "Information access restriction"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-ACC-005",
+      "title": "Ensure no unowned or ungrouped files or directories exist",
+      "category": "access_control",
+      "severity": "medium",
+      "status": "PASS",
+      "actual": "every file and directory on local file systems has an owner and a group",
+      "expected": "Every file and directory on a local file system has a known owner and group",
+      "remediation": "Assign each file to a valid account with \"chown <user>:<group> <path>\" or remove it.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AC-3",
+            "control_name": "Access Enforcement",
+            "control_family": "Access Control",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "AC-6",
+            "control_name": "Least Privilege",
+            "control_family": "Access Control",
+            "baselines": [
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.1",
+            "control_name": "Logical access security over protected information assets"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.3",
+            "control_name": "Information access restriction"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-ACC-006",
+      "title": "Review SUID and SGID executables",
+      "category": "access_control",
+      "severity": "high",
+      "status": "MANUAL",
+      "actual": "16 SUID or SGID files to compare with your baseline, for example: /usr/bin/chage, /usr/bin/chfn, /usr/bin/chsh, /usr/bin/crontab, /usr/bin/expiry (and 11 more)",
+      "expected": "Every SUID or SGID executable is known and justified",
+      "remediation": "Compare the list with your approved baseline and remove the bit with \"chmod u-s,g-s <file>\" where it is not needed.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "AC-6",
+            "control_name": "Least Privilege",
+            "control_family": "Access Control",
+            "baselines": [
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.3",
+            "control_name": "Role-based access and least privilege"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.18",
+            "control_name": "Use of privileged utility programs"
+          },
+          {
+            "control_id": "A.8.2",
+            "control_name": "Privileged access rights"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-SVC-001",
+      "title": "Ensure xinetd is not installed",
+      "category": "services",
+      "severity": "medium",
+      "status": "PASS",
+      "actual": "no xinetd package is installed",
+      "expected": "The xinetd package is not installed",
+      "remediation": "Remove it with \"apt purge xinetd\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "CM-7",
+            "control_name": "Least Functionality",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC7.1",
+            "control_name": "Configuration standards and detection of configuration changes"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.9",
+            "control_name": "Configuration management"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-SVC-002",
+      "title": "Ensure telnet server is not installed",
+      "category": "services",
+      "severity": "critical",
+      "status": "PASS",
+      "actual": "no telnet server package is installed",
+      "expected": "No telnet server package is installed",
+      "remediation": "Remove it with \"apt purge telnetd inetutils-telnetd\" and use SSH.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "CM-7",
+            "control_name": "Least Functionality",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "SC-8",
+            "control_name": "Transmission Confidentiality and Integrity",
+            "control_family": "System and Communications Protection",
+            "baselines": [
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.7",
+            "control_name": "Protection of information in transmission"
+          },
+          {
+            "control_id": "CC7.1",
+            "control_name": "Configuration standards and detection of configuration changes"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.21",
+            "control_name": "Security of network services"
+          },
+          {
+            "control_id": "A.8.9",
+            "control_name": "Configuration management"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-SVC-003",
+      "title": "Ensure FTP server is not installed",
+      "category": "services",
+      "severity": "high",
+      "status": "PASS",
+      "actual": "no FTP server package is installed",
+      "expected": "No FTP server package is installed",
+      "remediation": "Remove it with \"apt purge vsftpd\" and use SFTP.",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "CM-7",
+            "control_name": "Least Functionality",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          },
+          {
+            "control_id": "SC-8",
+            "control_name": "Transmission Confidentiality and Integrity",
+            "control_family": "System and Communications Protection",
+            "baselines": [
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC6.7",
+            "control_name": "Protection of information in transmission"
+          },
+          {
+            "control_id": "CC7.1",
+            "control_name": "Configuration standards and detection of configuration changes"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.21",
+            "control_name": "Security of network services"
+          },
+          {
+            "control_id": "A.8.9",
+            "control_name": "Configuration management"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-SVC-004",
+      "title": "Ensure HTTP server is not installed unless required",
+      "category": "services",
+      "severity": "medium",
+      "status": "PASS",
+      "actual": "no web server package is installed",
+      "expected": "No web server package is installed unless the host is documented as needing one",
+      "remediation": "Remove the web server if this host does not need one, for example \"apt purge apache2 nginx\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "CM-7",
+            "control_name": "Least Functionality",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC7.1",
+            "control_name": "Configuration standards and detection of configuration changes"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.9",
+            "control_name": "Configuration management"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-SVC-005",
+      "title": "Ensure LDAP server is not installed unless required",
+      "category": "services",
+      "severity": "medium",
+      "status": "PASS",
+      "actual": "no LDAP server package is installed",
+      "expected": "No LDAP server package is installed unless the host is documented as needing one",
+      "remediation": "Remove slapd if this host is not a directory server, with \"apt purge slapd\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "CM-7",
+            "control_name": "Least Functionality",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC7.1",
+            "control_name": "Configuration standards and detection of configuration changes"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.9",
+            "control_name": "Configuration management"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LNX-SVC-006",
+      "title": "Ensure NFS is not installed unless required",
+      "category": "services",
+      "severity": "medium",
+      "status": "PASS",
+      "actual": "no NFS server package is installed",
+      "expected": "No NFS server package is installed unless the host is documented as needing one",
+      "remediation": "Remove the NFS server if this host does not export file systems, with \"apt purge nfs-kernel-server\".",
+      "cis": {
+        "is_cis_recommendation": true,
+        "id": null
+      },
+      "frameworks": {
+        "nist_800_53": [
+          {
+            "control_id": "CM-7",
+            "control_name": "Least Functionality",
+            "control_family": "Configuration Management",
+            "baselines": [
+              "LOW",
+              "MODERATE",
+              "HIGH"
+            ]
+          }
+        ],
+        "soc2": [
+          {
+            "control_id": "CC7.1",
+            "control_name": "Configuration standards and detection of configuration changes"
+          }
+        ],
+        "iso_27001": [
+          {
+            "control_id": "A.8.9",
+            "control_name": "Configuration management"
+          }
+        ]
+      }
     }
   ],
-  "nist_summary": {
-    "controls_assessed": 12,
-    "controls": [
-      {"control_id": "AC-4", "control_name": "Information Flow Enforcement", "control_family": "Access Control", "checks_total": 2, "checks_passed": 1, "checks_failed": 1, "compliance_percentage": 50.0},
-      {"control_id": "AC-6", "control_name": "Least Privilege", "control_family": "Access Control", "checks_total": 8, "checks_passed": 7, "checks_failed": 1, "compliance_percentage": 87.5},
-      {"control_id": "AC-17", "control_name": "Remote Access", "control_family": "Access Control", "checks_total": 2, "checks_passed": 2, "checks_failed": 0, "compliance_percentage": 100.0},
-      {"control_id": "AU-2", "control_name": "Audit Events", "control_family": "Audit and Accountability", "checks_total": 2, "checks_passed": 2, "checks_failed": 0, "compliance_percentage": 100.0},
-      {"control_id": "AU-3", "control_name": "Content of Audit Records", "control_family": "Audit and Accountability", "checks_total": 2, "checks_passed": 2, "checks_failed": 0, "compliance_percentage": 100.0},
-      {"control_id": "CM-7", "control_name": "Least Functionality", "control_family": "Configuration Management", "checks_total": 15, "checks_passed": 13, "checks_failed": 2, "compliance_percentage": 86.7},
-      {"control_id": "IA-2", "control_name": "Identification and Authentication (Organizational Users)", "control_family": "Identification and Authentication", "checks_total": 4, "checks_passed": 4, "checks_failed": 0, "compliance_percentage": 100.0},
-      {"control_id": "IA-5", "control_name": "Authenticator Management", "control_family": "Identification and Authentication", "checks_total": 6, "checks_passed": 6, "checks_failed": 0, "compliance_percentage": 100.0},
-      {"control_id": "SC-7", "control_name": "Boundary Protection", "control_family": "System and Communications Protection", "checks_total": 7, "checks_passed": 5, "checks_failed": 2, "compliance_percentage": 71.4},
-      {"control_id": "SC-8", "control_name": "Transmission Confidentiality and Integrity", "control_family": "System and Communications Protection", "checks_total": 2, "checks_passed": 2, "checks_failed": 0, "compliance_percentage": 100.0},
-      {"control_id": "SC-28", "control_name": "Protection of Information at Rest", "control_family": "System and Communications Protection", "checks_total": 3, "checks_passed": 3, "checks_failed": 0, "compliance_percentage": 100.0}
-    ],
-    "family_summary": [
-      {"family": "Access Control", "controls": 3, "checks_passed": 10, "checks_total": 12, "compliance_percentage": 83.3},
-      {"family": "Audit and Accountability", "controls": 2, "checks_passed": 4, "checks_total": 4, "compliance_percentage": 100.0},
-      {"family": "Configuration Management", "controls": 1, "checks_passed": 13, "checks_total": 15, "compliance_percentage": 86.7},
-      {"family": "Identification and Authentication", "controls": 2, "checks_passed": 10, "checks_total": 10, "compliance_percentage": 100.0},
-      {"family": "System and Communications Protection", "controls": 3, "checks_passed": 10, "checks_total": 12, "compliance_percentage": 83.3}
-    ]
+  "framework_summary": {
+    "nist_800_53": {
+      "label": "NIST SP 800-53 Rev. 5",
+      "controls_assessed": 18,
+      "controls": [
+        {
+          "control_id": "AC-2",
+          "control_name": "Account Management",
+          "control_family": "Access Control",
+          "baselines": [
+            "LOW",
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 2,
+          "checks_passed": 2,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "AC-3",
+          "control_name": "Access Enforcement",
+          "control_family": "Access Control",
+          "baselines": [
+            "LOW",
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 5,
+          "checks_passed": 5,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "AC-4",
+          "control_name": "Information Flow Enforcement",
+          "control_family": "Access Control",
+          "baselines": [
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 1,
+          "checks_passed": 0,
+          "checks_failed": 1,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 0.0
+        },
+        {
+          "control_id": "AC-6",
+          "control_name": "Least Privilege",
+          "control_family": "Access Control",
+          "baselines": [
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 10,
+          "checks_passed": 8,
+          "checks_failed": 0,
+          "checks_no_verdict": 2,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "AC-7",
+          "control_name": "Unsuccessful Logon Attempts",
+          "control_family": "Access Control",
+          "baselines": [
+            "LOW",
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 1,
+          "checks_passed": 1,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "AC-17",
+          "control_name": "Remote Access",
+          "control_family": "Access Control",
+          "baselines": [
+            "LOW",
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 3,
+          "checks_passed": 3,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "AU-2",
+          "control_name": "Event Logging",
+          "control_family": "Audit and Accountability",
+          "baselines": [
+            "LOW",
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 1,
+          "checks_passed": 1,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "AU-4",
+          "control_name": "Audit Log Storage Capacity",
+          "control_family": "Audit and Accountability",
+          "baselines": [
+            "LOW",
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 2,
+          "checks_passed": 2,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "AU-9",
+          "control_name": "Protection of Audit Information",
+          "control_family": "Audit and Accountability",
+          "baselines": [
+            "LOW",
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 1,
+          "checks_passed": 1,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "AU-11",
+          "control_name": "Audit Record Retention",
+          "control_family": "Audit and Accountability",
+          "baselines": [
+            "LOW",
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 1,
+          "checks_passed": 1,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "AU-12",
+          "control_name": "Audit Record Generation",
+          "control_family": "Audit and Accountability",
+          "baselines": [
+            "LOW",
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 2,
+          "checks_passed": 2,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "CM-6",
+          "control_name": "Configuration Settings",
+          "control_family": "Configuration Management",
+          "baselines": [
+            "LOW",
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 13,
+          "checks_passed": 9,
+          "checks_failed": 4,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 69.2
+        },
+        {
+          "control_id": "CM-7",
+          "control_name": "Least Functionality",
+          "control_family": "Configuration Management",
+          "baselines": [
+            "LOW",
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 11,
+          "checks_passed": 10,
+          "checks_failed": 1,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 90.9
+        },
+        {
+          "control_id": "IA-2",
+          "control_name": "Identification and Authentication (Organizational Users)",
+          "control_family": "Identification and Authentication",
+          "baselines": [
+            "LOW",
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 3,
+          "checks_passed": 2,
+          "checks_failed": 0,
+          "checks_no_verdict": 1,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "IA-5",
+          "control_name": "Authenticator Management",
+          "control_family": "Identification and Authentication",
+          "baselines": [
+            "LOW",
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 7,
+          "checks_passed": 7,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "SC-5",
+          "control_name": "Denial-of-service Protection",
+          "control_family": "System and Communications Protection",
+          "baselines": [
+            "LOW",
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 2,
+          "checks_passed": 2,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "SC-7",
+          "control_name": "Boundary Protection",
+          "control_family": "System and Communications Protection",
+          "baselines": [
+            "LOW",
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 5,
+          "checks_passed": 1,
+          "checks_failed": 4,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 20.0
+        },
+        {
+          "control_id": "SC-8",
+          "control_name": "Transmission Confidentiality and Integrity",
+          "control_family": "System and Communications Protection",
+          "baselines": [
+            "MODERATE",
+            "HIGH"
+          ],
+          "checks_total": 2,
+          "checks_passed": 2,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        }
+      ]
+    },
+    "soc2": {
+      "label": "SOC 2 Trust Services Criteria (2017, common criteria)",
+      "controls_assessed": 8,
+      "controls": [
+        {
+          "control_id": "CC6.1",
+          "control_name": "Logical access security over protected information assets",
+          "checks_total": 13,
+          "checks_passed": 13,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "CC6.2",
+          "control_name": "Registration and removal of user access",
+          "checks_total": 1,
+          "checks_passed": 1,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "CC6.3",
+          "control_name": "Role-based access and least privilege",
+          "checks_total": 8,
+          "checks_passed": 6,
+          "checks_failed": 0,
+          "checks_no_verdict": 2,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "CC6.6",
+          "control_name": "Protection against threats from outside the system boundary",
+          "checks_total": 10,
+          "checks_passed": 6,
+          "checks_failed": 4,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 60.0
+        },
+        {
+          "control_id": "CC6.7",
+          "control_name": "Protection of information in transmission",
+          "checks_total": 2,
+          "checks_passed": 2,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "CC6.8",
+          "control_name": "Prevention and detection of unauthorized or malicious software",
+          "checks_total": 1,
+          "checks_passed": 1,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "CC7.1",
+          "control_name": "Configuration standards and detection of configuration changes",
+          "checks_total": 13,
+          "checks_passed": 12,
+          "checks_failed": 1,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 92.3
+        },
+        {
+          "control_id": "CC7.2",
+          "control_name": "Monitoring of system components for anomalies",
+          "checks_total": 5,
+          "checks_passed": 5,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        }
+      ]
+    },
+    "iso_27001": {
+      "label": "ISO/IEC 27001:2022 Annex A",
+      "controls_assessed": 11,
+      "controls": [
+        {
+          "control_id": "A.5.17",
+          "control_name": "Authentication information",
+          "checks_total": 4,
+          "checks_passed": 4,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "A.5.18",
+          "control_name": "Access rights",
+          "checks_total": 1,
+          "checks_passed": 1,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "A.8.2",
+          "control_name": "Privileged access rights",
+          "checks_total": 5,
+          "checks_passed": 3,
+          "checks_failed": 0,
+          "checks_no_verdict": 2,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "A.8.3",
+          "control_name": "Information access restriction",
+          "checks_total": 6,
+          "checks_passed": 6,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "A.8.5",
+          "control_name": "Secure authentication",
+          "checks_total": 4,
+          "checks_passed": 4,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "A.8.9",
+          "control_name": "Configuration management",
+          "checks_total": 13,
+          "checks_passed": 12,
+          "checks_failed": 1,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 92.3
+        },
+        {
+          "control_id": "A.8.15",
+          "control_name": "Logging",
+          "checks_total": 5,
+          "checks_passed": 5,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "A.8.18",
+          "control_name": "Use of privileged utility programs",
+          "checks_total": 1,
+          "checks_passed": 0,
+          "checks_failed": 0,
+          "checks_no_verdict": 1,
+          "compliance_percentage": null
+        },
+        {
+          "control_id": "A.8.20",
+          "control_name": "Networks security",
+          "checks_total": 7,
+          "checks_passed": 3,
+          "checks_failed": 4,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 42.9
+        },
+        {
+          "control_id": "A.8.21",
+          "control_name": "Security of network services",
+          "checks_total": 2,
+          "checks_passed": 2,
+          "checks_failed": 0,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 100.0
+        },
+        {
+          "control_id": "A.8.22",
+          "control_name": "Segregation of networks",
+          "checks_total": 2,
+          "checks_passed": 1,
+          "checks_failed": 1,
+          "checks_no_verdict": 0,
+          "compliance_percentage": 50.0
+        }
+      ]
+    }
   },
   "recommendations": [
     {
       "priority": "critical",
-      "check_id": "NET-007",
-      "check_name": "Ensure firewall is active",
-      "category": "network",
-      "current_state": "ufw: False, firewalld: False, iptables rules: False",
-      "expected_state": "At least one firewall should be active",
-      "remediation": "Enable ufw: sudo ufw enable",
-      "nist_controls": ["SC-7", "AC-4"]
+      "check_id": "LNX-NET-007",
+      "title": "Ensure a host firewall is active",
+      "current_state": "iptables has no rules and accepts by default",
+      "expected_state": "ufw, firewalld, nftables or iptables is active with a filtering rule set",
+      "remediation": "Enable one host firewall, for example \"ufw enable\" after allowing the services the host needs.",
+      "nist_800_53": [
+        "SC-7",
+        "AC-4"
+      ]
+    },
+    {
+      "priority": "medium",
+      "check_id": "LNX-FS-002",
+      "title": "Ensure mounting of squashfs filesystems is disabled",
+      "current_state": "squashfs is available in the running kernel (listed in /proc/filesystems)",
+      "expected_state": "The squashfs kernel module is not loaded and cannot be loaded",
+      "remediation": "Create /etc/modprobe.d/squashfs.conf containing \"install squashfs /bin/false\" and \"blacklist squashfs\". Do not apply this on hosts that use snap packages.",
+      "nist_800_53": [
+        "CM-7",
+        "CM-6"
+      ]
+    },
+    {
+      "priority": "medium",
+      "check_id": "LNX-NET-002",
+      "title": "Ensure packet redirect sending is disabled",
+      "current_state": "net.ipv4.conf.all.send_redirects = 1, net.ipv4.conf.default.send_redirects = 1",
+      "expected_state": "net.ipv4.conf.all.send_redirects and net.ipv4.conf.default.send_redirects are 0",
+      "remediation": "Set both send_redirects keys to 0 in a file under /etc/sysctl.d and run \"sysctl --system\".",
+      "nist_800_53": [
+        "SC-7",
+        "CM-6"
+      ]
+    },
+    {
+      "priority": "medium",
+      "check_id": "LNX-NET-003",
+      "title": "Ensure source routed packets are not accepted",
+      "current_state": "net.ipv4.conf.all.accept_source_route = 0, net.ipv4.conf.default.accept_source_route = 1; IPv6 is not enabled",
+      "expected_state": "accept_source_route is 0 for \"all\" and \"default\" on IPv4 and on IPv6 where IPv6 is enabled",
+      "remediation": "Set the accept_source_route keys to 0 in a file under /etc/sysctl.d and run \"sysctl --system\".",
+      "nist_800_53": [
+        "SC-7",
+        "CM-6"
+      ]
+    },
+    {
+      "priority": "medium",
+      "check_id": "LNX-NET-004",
+      "title": "Ensure ICMP redirects are not accepted",
+      "current_state": "net.ipv4.conf.all.accept_redirects = 1, net.ipv4.conf.default.accept_redirects = 1; IPv6 is not enabled",
+      "expected_state": "accept_redirects is 0 for \"all\" and \"default\" on IPv4 and on IPv6 where IPv6 is enabled",
+      "remediation": "Set the accept_redirects keys to 0 in a file under /etc/sysctl.d and run \"sysctl --system\".",
+      "nist_800_53": [
+        "SC-7",
+        "CM-6"
+      ]
     }
   ]
 }

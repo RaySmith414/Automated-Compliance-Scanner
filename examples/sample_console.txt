@@ -1,0 +1,109 @@
+Automated Compliance Scanner 2.0.0 on linux
+Host: ubuntu2204-lab   OS: Ubuntu 22.04 LTS   Scan time (UTC): 2026-11-17T23:33:30Z
+Checks run: 41   Passed: 34   Failed: 5   Not assessed: 0   Manual review: 1   Not applicable: 1
+Compliance rate (pass / assessed): 87.2%
+
+┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ ID           ┃ Check                                                           ┃ Severity ┃ Status         ┃
+┡━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ LNX-FS-001   │ Ensure mounting of cramfs filesystems is disabled               │ HIGH     │ PASS           │
+│ LNX-FS-002   │ Ensure mounting of squashfs filesystems is disabled             │ MEDIUM   │ FAIL           │
+│ LNX-FS-003   │ Ensure mounting of udf filesystems is disabled                  │ LOW      │ PASS           │
+│ LNX-FS-004   │ Ensure /tmp is a separate partition                             │ HIGH     │ PASS           │
+│ LNX-FS-005   │ Ensure noexec option set on /tmp partition                      │ HIGH     │ PASS           │
+│ LNX-FS-006   │ Ensure nodev option set on /tmp partition                       │ MEDIUM   │ PASS           │
+│ LNX-FS-007   │ Ensure nosuid option set on /tmp partition                      │ MEDIUM   │ PASS           │
+│ LNX-AUTH-001 │ Ensure password expiration is 365 days or less                  │ HIGH     │ PASS           │
+│ LNX-AUTH-002 │ Ensure minimum days between password changes is configured      │ MEDIUM   │ PASS           │
+│ LNX-AUTH-003 │ Ensure password expiration warning days is 7 or more            │ LOW      │ PASS           │
+│ LNX-AUTH-004 │ Ensure inactive password lock is 30 days or less                │ MEDIUM   │ PASS           │
+│ LNX-AUTH-005 │ Ensure root is the only UID 0 account                           │ CRITICAL │ PASS           │
+│ LNX-AUTH-006 │ Ensure root login is restricted to system console               │ HIGH     │ NOT APPLICABLE │
+│ LNX-AUTH-007 │ Ensure SSH root login is disabled                               │ CRITICAL │ PASS           │
+│ LNX-AUTH-008 │ Ensure SSH PermitEmptyPasswords is disabled                     │ CRITICAL │ PASS           │
+│ LNX-AUTH-009 │ Review SSH PasswordAuthentication against site policy           │ MEDIUM   │ PASS           │
+│ LNX-AUTH-010 │ Ensure SSH MaxAuthTries is set to 4 or less                     │ MEDIUM   │ PASS           │
+│ LNX-NET-001  │ Ensure IP forwarding is disabled                                │ HIGH     │ PASS           │
+│ LNX-NET-002  │ Ensure packet redirect sending is disabled                      │ MEDIUM   │ FAIL           │
+│ LNX-NET-003  │ Ensure source routed packets are not accepted                   │ MEDIUM   │ FAIL           │
+│ LNX-NET-004  │ Ensure ICMP redirects are not accepted                          │ MEDIUM   │ FAIL           │
+│ LNX-NET-005  │ Ensure broadcast ICMP requests are ignored                      │ MEDIUM   │ PASS           │
+│ LNX-NET-006  │ Ensure TCP SYN Cookies is enabled                               │ HIGH     │ PASS           │
+│ LNX-NET-007  │ Ensure a host firewall is active                                │ CRITICAL │ FAIL           │
+│ LNX-LOG-001  │ Ensure rsyslog is installed                                     │ HIGH     │ PASS           │
+│ LNX-LOG-002  │ Ensure rsyslog service is enabled                               │ HIGH     │ PASS           │
+│ LNX-LOG-003  │ Ensure journald is configured to compress large log files       │ LOW      │ PASS           │
+│ LNX-LOG-004  │ Ensure journald is configured to write logfiles to persistent   │ MEDIUM   │ PASS           │
+│              │ disk                                                            │          │                │
+│ LNX-LOG-005  │ Ensure permissions on /var/log are configured                   │ MEDIUM   │ PASS           │
+│ LNX-ACC-001  │ Ensure permissions on /etc/passwd are configured                │ HIGH     │ PASS           │
+│ LNX-ACC-002  │ Ensure permissions on /etc/shadow are configured                │ CRITICAL │ PASS           │
+│ LNX-ACC-003  │ Ensure permissions on /etc/group are configured                 │ HIGH     │ PASS           │
+│ LNX-ACC-004  │ Ensure no world writable files exist                            │ HIGH     │ PASS           │
+│ LNX-ACC-005  │ Ensure no unowned or ungrouped files or directories exist       │ MEDIUM   │ PASS           │
+│ LNX-ACC-006  │ Review SUID and SGID executables                                │ HIGH     │ MANUAL         │
+│ LNX-SVC-001  │ Ensure xinetd is not installed                                  │ MEDIUM   │ PASS           │
+│ LNX-SVC-002  │ Ensure telnet server is not installed                           │ CRITICAL │ PASS           │
+│ LNX-SVC-003  │ Ensure FTP server is not installed                              │ HIGH     │ PASS           │
+│ LNX-SVC-004  │ Ensure HTTP server is not installed unless required             │ MEDIUM   │ PASS           │
+│ LNX-SVC-005  │ Ensure LDAP server is not installed unless required             │ MEDIUM   │ PASS           │
+│ LNX-SVC-006  │ Ensure NFS is not installed unless required                     │ MEDIUM   │ PASS           │
+└──────────────┴─────────────────────────────────────────────────────────────────┴──────────┴────────────────┘
+                                   NIST SP 800-53 Rev. 5: control coverage                                    
+┏━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃ Control ┃ Name                                                 ┃ Passed ┃ Failed ┃ No verdict ┃ Compliance ┃
+┡━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ AC-2    │ Account Management                                   │ 2      │ 0      │ 0          │ 100.0%     │
+│ AC-3    │ Access Enforcement                                   │ 5      │ 0      │ 0          │ 100.0%     │
+│ AC-4    │ Information Flow Enforcement                         │ 0      │ 1      │ 0          │ 0.0%       │
+│ AC-6    │ Least Privilege                                      │ 8      │ 0      │ 2          │ 100.0%     │
+│ AC-7    │ Unsuccessful Logon Attempts                          │ 1      │ 0      │ 0          │ 100.0%     │
+│ AC-17   │ Remote Access                                        │ 3      │ 0      │ 0          │ 100.0%     │
+│ AU-2    │ Event Logging                                        │ 1      │ 0      │ 0          │ 100.0%     │
+│ AU-4    │ Audit Log Storage Capacity                           │ 2      │ 0      │ 0          │ 100.0%     │
+│ AU-9    │ Protection of Audit Information                      │ 1      │ 0      │ 0          │ 100.0%     │
+│ AU-11   │ Audit Record Retention                               │ 1      │ 0      │ 0          │ 100.0%     │
+│ AU-12   │ Audit Record Generation                              │ 2      │ 0      │ 0          │ 100.0%     │
+│ CM-6    │ Configuration Settings                               │ 9      │ 4      │ 0          │ 69.2%      │
+│ CM-7    │ Least Functionality                                  │ 10     │ 1      │ 0          │ 90.9%      │
+│ IA-2    │ Identification and Authentication (Organizational    │ 2      │ 0      │ 1          │ 100.0%     │
+│         │ Users)                                               │        │        │            │            │
+│ IA-5    │ Authenticator Management                             │ 7      │ 0      │ 0          │ 100.0%     │
+│ SC-5    │ Denial-of-service Protection                         │ 2      │ 0      │ 0          │ 100.0%     │
+│ SC-7    │ Boundary Protection                                  │ 1      │ 4      │ 0          │ 20.0%      │
+│ SC-8    │ Transmission Confidentiality and Integrity           │ 2      │ 0      │ 0          │ 100.0%     │
+└─────────┴──────────────────────────────────────────────────────┴────────┴────────┴────────────┴────────────┘
+
+Failed checks (5)
+LNX-FS-002 Ensure mounting of squashfs filesystems is disabled
+  Found:    squashfs is available in the running kernel (listed in /proc/filesystems)
+  Expected: The squashfs kernel module is not loaded and cannot be loaded
+  Fix:      Create /etc/modprobe.d/squashfs.conf containing "install squashfs /bin/false" and "blacklist 
+squashfs". Do not apply this on hosts that use snap packages.
+LNX-NET-002 Ensure packet redirect sending is disabled
+  Found:    net.ipv4.conf.all.send_redirects = 1, net.ipv4.conf.default.send_redirects = 1
+  Expected: net.ipv4.conf.all.send_redirects and net.ipv4.conf.default.send_redirects are 0
+  Fix:      Set both send_redirects keys to 0 in a file under /etc/sysctl.d and run "sysctl --system".
+LNX-NET-003 Ensure source routed packets are not accepted
+  Found:    net.ipv4.conf.all.accept_source_route = 0, net.ipv4.conf.default.accept_source_route = 1; IPv6 is 
+not enabled
+  Expected: accept_source_route is 0 for "all" and "default" on IPv4 and on IPv6 where IPv6 is enabled
+  Fix:      Set the accept_source_route keys to 0 in a file under /etc/sysctl.d and run "sysctl --system".
+LNX-NET-004 Ensure ICMP redirects are not accepted
+  Found:    net.ipv4.conf.all.accept_redirects = 1, net.ipv4.conf.default.accept_redirects = 1; IPv6 is not 
+enabled
+  Expected: accept_redirects is 0 for "all" and "default" on IPv4 and on IPv6 where IPv6 is enabled
+  Fix:      Set the accept_redirects keys to 0 in a file under /etc/sysctl.d and run "sysctl --system".
+LNX-NET-007 Ensure a host firewall is active
+  Found:    iptables has no rules and accepts by default
+  Expected: ufw, firewalld, nftables or iptables is active with a filtering rule set
+  Fix:      Enable one host firewall, for example "ufw enable" after allowing the services the host needs.
+
+Manual review (1)
+LNX-ACC-006 Review SUID and SGID executables
+  Found:    16 SUID or SGID files to compare with your baseline, for example: /usr/bin/chage, /usr/bin/chfn, 
+/usr/bin/chsh, /usr/bin/crontab, /usr/bin/expiry (and 11 more)
+  Expected: Every SUID or SGID executable is known and justified
+  Fix:      Compare the list with your approved baseline and remove the bit with "chmod u-s,g-s <file>" where 
+it is not needed.
+1 critical check(s) failed.

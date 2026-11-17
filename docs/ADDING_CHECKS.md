@@ -1,234 +1,124 @@
-# Guide to Adding New Compliance Checks
+# Adding a check
 
-This guide explains how to add new compliance checks to the Automated Compliance Scanner.
+A check has two parts that live in different places:
 
-## Overview
+| Part | Where | What it holds |
+| --- | --- | --- |
+| Catalog entry | `scanner/data/checks_linux.yaml` or `checks_windows.yaml` | ID, title, category, severity, expected state, remediation text and framework mappings |
+| Test logic | `scanner/linux_checks.py` or `scanner/windows_checks.py` | One method that reads the host and returns a verdict |
 
-Adding a new check involves:
-1. Implementing the check function
-2. Adding the check to the checks dictionary
-3. Mapping to NIST controls
-4. Writing tests
-5. Updating documentation
+The catalog is the single source for everything a report prints about a check. The method only decides the outcome. `tests/test_catalog.py` fails when a catalog entry has no method or a method has no catalog entry.
 
-## Step 1: Implement the Check Function
+The steps below add a real example: a Linux check for the permissions on `/etc/crontab`.
 
-Each check function should:
-- Return a dictionary with `passed`, `actual`, `expected`, and `remediation` keys
-- Handle errors gracefully
-- Be deterministic and idempotent
+## 1. Add the catalog entry
 
-### Check Function Template
+Append an entry to `scanner/data/checks_linux.yaml`. Use the next free number in the category.
+
+```yaml
+  - id: LNX-ACC-007
+    function: crontab_permissions
+    title: Ensure permissions on /etc/crontab are configured
+    category: access_control
+    severity: medium
+    requires_root: false
+    expected: /etc/crontab is owned by root:root with mode 0600 or stricter
+    remediation: Run "chown root:root /etc/crontab" and "chmod 600 /etc/crontab".
+    cis_id: null
+    nist_800_53: [AC-3, AC-6]
+    soc2: [CC6.1, CC6.3]
+    iso_27001: [A.8.3]
+```
+
+Field rules, all enforced when the catalog loads:
+
+- `id` starts with `LNX-` or `WIN-` and is unique.
+- `function` is the name of the method you add in step 2.
+- `category` is one of `filesystem`, `authentication`, `network`, `logging`, `access_control`, `services`.
+- `severity` is one of `critical`, `high`, `medium`, `low`. The POA&M export gives critical and high findings 30 days, medium 90 and low 180.
+- `requires_root: true` makes the runner report ERROR instead of calling the method when the scan is not privileged. Set it when the answer cannot be read without root or administrator rights.
+- `cis_id` stays `null` unless you have the number from the benchmark version you follow. Write it as a quoted string such as `"5.1.2"`. The same number cannot be used twice.
+- Add `cis: false` when the check is not a CIS recommendation.
+- Every control ID must exist in `scanner/data/frameworks.yaml`. A check needs at least one NIST SP 800-53 control. To map to a control that is not listed yet, add it to `frameworks.yaml` with its official title first.
+
+## 2. Write the method
+
+Add a method with the same name to `LinuxChecks` in `scanner/linux_checks.py`.
 
 ```python
-def check_example_control(self) -> Dict:
-    """
-    CIS X.X.X - Brief description of the check
-
-    Detailed explanation of what this check verifies and why it matters.
-    """
-    # Perform the check
-    try:
-        # Your check logic here
-        code, output, _ = self._run_command("your command here")
-
-        # Determine if check passed
-        passed = (code == 0 and "expected_value" in output)
-
-        return {
-            'passed': passed,
-            'actual': output if output else 'Unable to determine',
-            'expected': 'Description of expected state',
-            'remediation': 'Command or steps to fix the issue'
-        }
-    except Exception as e:
-        return {
-            'passed': False,
-            'actual': f'Error: {str(e)}',
-            'expected': 'Description of expected state',
-            'remediation': 'Command or steps to fix the issue'
-        }
+    def crontab_permissions(self) -> Outcome:
+        if self.probe.stat("/etc/crontab") is None:
+            raise NotApplicable("/etc/crontab does not exist, so cron is not installed")
+        return self._file_permissions("/etc/crontab", 0o600, [])
 ```
 
-### Example: Adding a New Linux Check
+A method ends in one of five ways:
 
-```python
-def check_cron_restricted(self) -> Dict:
-    """
-    CIS 5.1.8 - Ensure cron is restricted to authorized users
+| Outcome | How | Use it when |
+| --- | --- | --- |
+| PASS | `return passed("what was found")` | The host meets the expected state |
+| FAIL | `return failed("what was found")` | The host does not meet it |
+| MANUAL | `return manual("evidence to review")` | The scanner can collect evidence but a person has to decide |
+| NOT_APPLICABLE | `raise NotApplicable("why")` | The control does not apply to this host |
+| ERROR | `raise Unassessable("why")` | The state could not be read |
 
-    Verifies that /etc/cron.allow exists and /etc/cron.deny does not,
-    ensuring only explicitly authorized users can schedule cron jobs.
-    """
-    cron_allow_exists = os.path.exists('/etc/cron.allow')
-    cron_deny_exists = os.path.exists('/etc/cron.deny')
+Rules that keep results honest:
 
-    passed = cron_allow_exists and not cron_deny_exists
+1. **No answer is never a pass.** A missing tool, a timeout, a denied read or output you cannot parse is `Unassessable`. Do not fall back to a default value.
+2. **Go through the probe.** Read files with `self.probe.read_text`, file modes with `self.probe.stat` and commands with `self.probe.run([...])`. Commands are argument lists. Nothing runs through a shell.
+3. **Never change the host.** Checks only read.
+4. **Compare permission bits with `mode_within`.** Comparing modes as numbers gets it wrong: 0604 is smaller than 0640 and still world readable.
+5. **Say what you found.** The text you pass to `passed`, `failed` or `manual` is the "Found" line in every report, so include the value you read.
 
-    return {
-        'passed': passed,
-        'actual': f'cron.allow exists: {cron_allow_exists}, cron.deny exists: {cron_deny_exists}',
-        'expected': '/etc/cron.allow should exist, /etc/cron.deny should not exist',
-        'remediation': 'rm /etc/cron.deny && touch /etc/cron.allow && chmod 600 /etc/cron.allow'
-    }
-```
+Windows checks follow the same rules. Each query is a PowerShell script that prints JSON, read with `self._ps_json(...)`, so the decision in Python can be tested on any platform.
 
-## Step 2: Register the Check
+## 3. Add tests
 
-Add your check to the `self.checks` dictionary in the `__init__` method:
+Tests run against a fake host, so they need no root and behave the same everywhere.
 
-```python
-self.checks = {
-    # ... existing categories ...
-    'scheduling': [
-        ('CRON-001', 'Ensure cron is restricted to authorized users', 'medium', self.check_cron_restricted),
-        # Add more scheduling checks here
-    ],
-}
-```
+1. Give the clean host a passing answer. In `tests/linux_host.py`, add the file to `stats` inside `hardened_probe`:
 
-The tuple format is:
-```python
-(check_id, check_name, severity, check_function)
-```
+   ```python
+        "/etc/crontab": stat(0o600),
+   ```
 
-Where:
-- `check_id`: Unique identifier (format: CATEGORY-NNN)
-- `check_name`: Human-readable description
-- `severity`: One of 'critical', 'high', 'medium', 'low'
-- `check_function`: Reference to the check method
+2. Add cases to `CASES` in `tests/test_linux_checks.py`. Each case changes one fact on the clean host and names the status and a fragment of the "Found" text it expects. `tests/test_linux_checks.py` fails if a check has no case that ends in something other than PASS.
 
-## Step 3: Add NIST Mapping
+   ```python
+    ("crontab_permissions", lambda: hardened_probe(stats={"/etc/crontab": stat(0o644)}), "FAIL", "0644"),
+    ("crontab_permissions", lambda: hardened_probe(stats={"/etc/crontab": stat(0o600, "bob", "root")}), "FAIL", "bob"),
+    ("crontab_permissions", lambda: hardened_probe(stats={"/etc/crontab": None}), "NOT_APPLICABLE", "cron is not installed"),
+   ```
 
-In `scanner/nist_mapper.py`, add the mapping for your new check:
+3. Update the count in `test_expected_check_counts` in `tests/test_catalog.py`.
 
-```python
-self.mappings = {
-    # ... existing mappings ...
-    'CRON-001': ['CM-7', 'AC-3'],  # Least Functionality, Access Enforcement
-}
-```
+4. If the answer is stable on a stock Ubuntu image, add the expected verdict for both states to `tests/containers/expected.json`. CI then proves the check against real Ubuntu 22.04 and 24.04 containers. When the hardened state needs a new setting, apply it in `tests/containers/run_state.sh`.
 
-Choose appropriate NIST controls based on what the check verifies:
+## 4. Regenerate the reference docs
 
-| If the check relates to... | Consider these controls |
-|---------------------------|------------------------|
-| User authentication | IA-2, IA-5 |
-| Access permissions | AC-3, AC-6 |
-| Logging/auditing | AU-2, AU-3, AU-9 |
-| Network configuration | SC-7, SC-5 |
-| Service configuration | CM-7 |
-| Data protection | SC-28, SC-8 |
-
-## Step 4: Write Tests
-
-Add tests in `tests/test_linux_checks.py` (or appropriate test file):
-
-```python
-class TestCronChecks:
-    """Tests for cron-related compliance checks"""
-
-    def test_check_cron_restricted_pass(self, mocker):
-        """Test cron restriction check when properly configured"""
-        mocker.patch('os.path.exists', side_effect=lambda p: p == '/etc/cron.allow')
-
-        checker = LinuxComplianceChecker()
-        result = checker.check_cron_restricted()
-
-        assert result['passed'] == True
-        assert 'cron.allow exists: True' in result['actual']
-
-    def test_check_cron_restricted_fail(self, mocker):
-        """Test cron restriction check when misconfigured"""
-        mocker.patch('os.path.exists', return_value=False)
-
-        checker = LinuxComplianceChecker()
-        result = checker.check_cron_restricted()
-
-        assert result['passed'] == False
-        assert 'remediation' in result
-```
-
-## Step 5: Update Documentation
-
-### Update CONTROLS_REFERENCE.md
-
-Add an entry for your new check:
-
-```markdown
-### CRON-001: Ensure cron is restricted to authorized users
-**CIS Reference**: 5.1.8
-**Severity**: Medium
-**NIST Controls**: CM-7, AC-3
-
-Description of what this check does and why it's important.
-
-**Check Method**: Describe how the check works.
-
-**Remediation**:
-```bash
-rm /etc/cron.deny
-touch /etc/cron.allow
-chmod 600 /etc/cron.allow
-```
-```
-
-### Update NIST_MAPPING.md
-
-Add your check to the mapping table.
-
-## Best Practices
-
-### Check Implementation
-
-1. **Be specific**: Checks should verify one specific security setting
-2. **Handle errors**: Never let exceptions crash the scanner
-3. **Provide context**: The `actual` field should show what was found
-4. **Clear remediation**: The `remediation` field should be actionable
-
-### Severity Guidelines
-
-| Severity | Criteria |
-|----------|----------|
-| Critical | Direct path to system compromise, credential exposure |
-| High | Significant security weakness, important control missing |
-| Medium | Moderate risk, defense-in-depth measure |
-| Low | Minor hardening, best practice |
-
-### NIST Mapping Guidelines
-
-1. Map to the most specific applicable control
-2. Multiple mappings are acceptable when appropriate
-3. Verify mappings against NIST 800-53 descriptions
-4. Consider all applicable control families
-
-## Testing Your Changes
+`docs/CHECKS.md` and `docs/MAPPINGS.md` are generated from the catalogs. Do not edit them by hand.
 
 ```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=scanner --cov-report=html
-
-# Run specific test file
-pytest tests/test_linux_checks.py -v
-
-# Test your new check directly
-python -c "from scanner.linux_checks import LinuxComplianceChecker; c = LinuxComplianceChecker(); print(c.check_cron_restricted())"
+python -m scanner.docs
 ```
 
-## Submitting Changes
+## 5. Run everything
 
-1. Create a feature branch
-2. Implement your changes following this guide
-3. Ensure all tests pass
-4. Update documentation
-5. Submit a pull request with:
-   - Description of the new check(s)
-   - CIS Benchmark reference
-   - NIST control mapping rationale
+```bash
+python -m pip install -e ".[dev]"
+ruff check .
+python -m scanner.docs --check
+python -m pytest
+```
 
----
+To try the new check on the machine you are on:
 
-*Author: Rayshaun Smith*
+```bash
+python -m scanner --categories access_control
+```
+
+## Choosing mappings
+
+Map a check to the control it gives direct evidence for, not to every control it touches. A file permission check is evidence for AC-3 (Access Enforcement) and AC-6 (Least Privilege). It is not evidence for AC-2 (Account Management).
+
+The mappings in this project are an informative crosswalk. They are not published by NIST, the AICPA, ISO or CIS. Keep new mappings to the same standard: a reviewer should be able to read the control text and see why the check belongs there.

@@ -1,0 +1,66 @@
+Compliance Scan Summary
+Scan time (UTC),2026-11-17T23:33:29Z
+Host,ubuntu2204-lab
+Operating system,Ubuntu 22.04 LTS
+
+Checks run,41
+Passed,34
+Failed,5
+Not assessed (error),0
+Manual review,1
+Not applicable,1
+Compliance rate (pass / assessed),87.2%
+
+Category,Checks,Passed,Failed,No verdict
+filesystem,7,6,1,0
+authentication,10,9,0,1
+network,7,3,4,0
+logging,5,5,0,0
+access_control,6,5,0,1
+services,6,6,0,0
+
+NIST SP 800-53 Rev. 5
+Control,Name,Passed,Failed,No verdict,Compliance
+AC-2,Account Management,2,0,0,100.0%
+AC-3,Access Enforcement,5,0,0,100.0%
+AC-4,Information Flow Enforcement,0,1,0,0.0%
+AC-6,Least Privilege,8,0,2,100.0%
+AC-7,Unsuccessful Logon Attempts,1,0,0,100.0%
+AC-17,Remote Access,3,0,0,100.0%
+AU-2,Event Logging,1,0,0,100.0%
+AU-4,Audit Log Storage Capacity,2,0,0,100.0%
+AU-9,Protection of Audit Information,1,0,0,100.0%
+AU-11,Audit Record Retention,1,0,0,100.0%
+AU-12,Audit Record Generation,2,0,0,100.0%
+CM-6,Configuration Settings,9,4,0,69.2%
+CM-7,Least Functionality,10,1,0,90.9%
+IA-2,Identification and Authentication (Organizational Users),2,0,1,100.0%
+IA-5,Authenticator Management,7,0,0,100.0%
+SC-5,Denial-of-service Protection,2,0,0,100.0%
+SC-7,Boundary Protection,1,4,0,20.0%
+SC-8,Transmission Confidentiality and Integrity,2,0,0,100.0%
+
+"SOC 2 Trust Services Criteria (2017, common criteria)"
+Control,Name,Passed,Failed,No verdict,Compliance
+CC6.1,Logical access security over protected information assets,13,0,0,100.0%
+CC6.2,Registration and removal of user access,1,0,0,100.0%
+CC6.3,Role-based access and least privilege,6,0,2,100.0%
+CC6.6,Protection against threats from outside the system boundary,6,4,0,60.0%
+CC6.7,Protection of information in transmission,2,0,0,100.0%
+CC6.8,Prevention and detection of unauthorized or malicious software,1,0,0,100.0%
+CC7.1,Configuration standards and detection of configuration changes,12,1,0,92.3%
+CC7.2,Monitoring of system components for anomalies,5,0,0,100.0%
+
+ISO/IEC 27001:2022 Annex A
+Control,Name,Passed,Failed,No verdict,Compliance
+A.5.17,Authentication information,4,0,0,100.0%
+A.5.18,Access rights,1,0,0,100.0%
+A.8.2,Privileged access rights,3,0,2,100.0%
+A.8.3,Information access restriction,6,0,0,100.0%
+A.8.5,Secure authentication,4,0,0,100.0%
+A.8.9,Configuration management,12,1,0,92.3%
+A.8.15,Logging,5,0,0,100.0%
+A.8.18,Use of privileged utility programs,0,0,1,n/a
+A.8.20,Networks security,3,4,0,42.9%
+A.8.21,Security of network services,2,0,0,100.0%
+A.8.22,Segregation of networks,1,1,0,50.0%
