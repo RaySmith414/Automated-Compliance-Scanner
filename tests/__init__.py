@@ -1,3 +1,1 @@
-"""
-Test suite for Automated Compliance Scanner
-"""
+"""Test suite for the Automated Compliance Scanner."""

@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "compliance-scanner"
+dynamic = ["version"]
+description = "Checks Linux and Windows hosts against CIS Benchmark recommendations and maps findings to NIST SP 800-53, SOC 2 and ISO/IEC 27001"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Rayshaun Smith" }]
+keywords = ["compliance", "cis-benchmark", "nist-800-53", "soc2", "iso27001", "grc", "security"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+]
+# The floors are the versions Ubuntu 22.04 packages, which the container tests run against.
+dependencies = [
+    "PyYAML>=5.4",
+    "Jinja2>=3.0",
+    "rich>=11.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-cov>=4.0", "ruff>=0.4"]
+
+[project.scripts]
+compliance-scanner = "scanner.main:main"
+
+[project.urls]
+Homepage = "https://github.com/RaySmith414/Automated-Compliance-Scanner"
+
+[tool.setuptools.packages.find]
+include = ["scanner*"]
+
+[tool.setuptools.package-data]
+scanner = ["data/*.yaml", "reports/templates/*.html"]
+
+[tool.setuptools.dynamic]
+version = { attr = "scanner.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["host: runs real commands against the machine the tests run on"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "S", "UP"]
+# S105 and S108 fire on the words PASS and /tmp, which this tool is about.
+ignore = ["S101", "S105", "S108", "S603", "S607", "UP006", "UP007", "UP035", "UP045"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S", "E501"]

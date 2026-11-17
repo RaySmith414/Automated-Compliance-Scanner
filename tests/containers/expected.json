@@ -1,0 +1,23 @@
+{
+  "_comment": "Verdicts that must hold on stock Ubuntu 22.04 and 24.04 images for each state. Checks whose answer depends on the kernel or network namespace of the machine running the container are left out on purpose.",
+  "baseline": {
+    "LNX-FS-004": "FAIL", "LNX-FS-005": "FAIL", "LNX-FS-006": "FAIL", "LNX-FS-007": "FAIL",
+    "LNX-AUTH-001": "FAIL", "LNX-AUTH-002": "FAIL", "LNX-AUTH-003": "PASS", "LNX-AUTH-004": "FAIL",
+    "LNX-AUTH-005": "PASS", "LNX-AUTH-006": "NOT_APPLICABLE", "LNX-AUTH-007": "FAIL", "LNX-AUTH-008": "PASS",
+    "LNX-AUTH-009": "MANUAL", "LNX-AUTH-010": "FAIL",
+    "LNX-LOG-001": "FAIL", "LNX-LOG-002": "FAIL", "LNX-LOG-003": "FAIL", "LNX-LOG-004": "FAIL", "LNX-LOG-005": "PASS",
+    "LNX-ACC-001": "PASS", "LNX-ACC-002": "PASS", "LNX-ACC-003": "PASS", "LNX-ACC-006": "MANUAL",
+    "LNX-SVC-001": "PASS", "LNX-SVC-002": "PASS", "LNX-SVC-003": "PASS", "LNX-SVC-004": "PASS",
+    "LNX-SVC-005": "PASS", "LNX-SVC-006": "PASS"
+  },
+  "hardened": {
+    "LNX-FS-004": "PASS", "LNX-FS-005": "PASS", "LNX-FS-006": "PASS", "LNX-FS-007": "PASS",
+    "LNX-AUTH-001": "PASS", "LNX-AUTH-002": "PASS", "LNX-AUTH-003": "PASS", "LNX-AUTH-004": "PASS",
+    "LNX-AUTH-005": "PASS", "LNX-AUTH-006": "NOT_APPLICABLE", "LNX-AUTH-007": "PASS", "LNX-AUTH-008": "PASS",
+    "LNX-AUTH-009": "PASS", "LNX-AUTH-010": "PASS",
+    "LNX-LOG-001": "PASS", "LNX-LOG-002": "PASS", "LNX-LOG-003": "PASS", "LNX-LOG-004": "PASS", "LNX-LOG-005": "PASS",
+    "LNX-ACC-001": "PASS", "LNX-ACC-002": "PASS", "LNX-ACC-003": "PASS", "LNX-ACC-006": "MANUAL",
+    "LNX-SVC-001": "PASS", "LNX-SVC-002": "PASS", "LNX-SVC-003": "PASS", "LNX-SVC-004": "PASS",
+    "LNX-SVC-005": "PASS", "LNX-SVC-006": "PASS"
+  }
+}

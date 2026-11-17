@@ -75,3 +75,6 @@ Thumbs.db
 compliance_report_*.html
 compliance_report_*.json
 compliance_report_*.csv
+
+# Linters
+.ruff_cache/

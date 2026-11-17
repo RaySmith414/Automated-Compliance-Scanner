@@ -1,0 +1,66 @@
+# Framework reference data for every control the check catalogs map to.
+#
+# The mappings in checks_linux.yaml and checks_windows.yaml are an informative
+# crosswalk prepared by the author for triage and reporting. They are not an
+# official mapping published by NIST, the AICPA, ISO or CIS. Validate them
+# against your own control set before you rely on them in an assessment.
+
+nist_800_53:
+  label: NIST SP 800-53 Rev. 5
+  families:
+    AC: Access Control
+    AU: Audit and Accountability
+    CM: Configuration Management
+    IA: Identification and Authentication
+    SC: System and Communications Protection
+  # Titles follow the Rev. 5 catalog. Baselines follow SP 800-53B.
+  controls:
+    AC-2: {title: Account Management, baselines: [LOW, MODERATE, HIGH]}
+    AC-3: {title: Access Enforcement, baselines: [LOW, MODERATE, HIGH]}
+    AC-4: {title: Information Flow Enforcement, baselines: [MODERATE, HIGH]}
+    AC-6: {title: Least Privilege, baselines: [MODERATE, HIGH]}
+    AC-7: {title: Unsuccessful Logon Attempts, baselines: [LOW, MODERATE, HIGH]}
+    AC-14: {title: Permitted Actions Without Identification or Authentication, baselines: [LOW, MODERATE, HIGH]}
+    AC-17: {title: Remote Access, baselines: [LOW, MODERATE, HIGH]}
+    AU-2: {title: Event Logging, baselines: [LOW, MODERATE, HIGH]}
+    AU-4: {title: Audit Log Storage Capacity, baselines: [LOW, MODERATE, HIGH]}
+    AU-9: {title: Protection of Audit Information, baselines: [LOW, MODERATE, HIGH]}
+    AU-11: {title: Audit Record Retention, baselines: [LOW, MODERATE, HIGH]}
+    AU-12: {title: Audit Record Generation, baselines: [LOW, MODERATE, HIGH]}
+    CM-6: {title: Configuration Settings, baselines: [LOW, MODERATE, HIGH]}
+    CM-7: {title: Least Functionality, baselines: [LOW, MODERATE, HIGH]}
+    IA-2: {title: Identification and Authentication (Organizational Users), baselines: [LOW, MODERATE, HIGH]}
+    IA-5: {title: Authenticator Management, baselines: [LOW, MODERATE, HIGH]}
+    SC-5: {title: Denial-of-service Protection, baselines: [LOW, MODERATE, HIGH]}
+    SC-7: {title: Boundary Protection, baselines: [LOW, MODERATE, HIGH]}
+    SC-8: {title: Transmission Confidentiality and Integrity, baselines: [MODERATE, HIGH]}
+
+soc2:
+  label: SOC 2 Trust Services Criteria (2017, common criteria)
+  # Short descriptive labels in the author's words, not the AICPA criteria text.
+  controls:
+    CC6.1: {title: Logical access security over protected information assets}
+    CC6.2: {title: Registration and removal of user access}
+    CC6.3: {title: Role-based access and least privilege}
+    CC6.6: {title: Protection against threats from outside the system boundary}
+    CC6.7: {title: Protection of information in transmission}
+    CC6.8: {title: Prevention and detection of unauthorized or malicious software}
+    CC7.1: {title: Configuration standards and detection of configuration changes}
+    CC7.2: {title: Monitoring of system components for anomalies}
+
+iso_27001:
+  label: ISO/IEC 27001:2022 Annex A
+  controls:
+    A.5.15: {title: Access control}
+    A.5.17: {title: Authentication information}
+    A.5.18: {title: Access rights}
+    A.8.2: {title: Privileged access rights}
+    A.8.3: {title: Information access restriction}
+    A.8.5: {title: Secure authentication}
+    A.8.9: {title: Configuration management}
+    A.8.15: {title: Logging}
+    A.8.18: {title: Use of privileged utility programs}
+    A.8.20: {title: Networks security}
+    A.8.21: {title: Security of network services}
+    A.8.22: {title: Segregation of networks}
+    A.8.24: {title: Use of cryptography}

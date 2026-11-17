@@ -1,281 +1,207 @@
 #!/usr/bin/env python3
-"""
-Automated Compliance Scanner
-Checks systems against CIS Benchmarks and maps to NIST 800-53 controls
-
-Author: Rayshaun Smith
-GitHub: https://github.com/RaySmith414
-"""
+"""Command line entry point for the Automated Compliance Scanner."""
 
 import argparse
-import platform
 import sys
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from rich.console import Console
 from rich.table import Table
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from scanner.linux_checks import LinuxComplianceChecker
-from scanner.windows_checks import WindowsComplianceChecker
-from scanner.nist_mapper import NISTMapper
-from reports.html_report import HTMLReportGenerator
-from reports.json_report import JSONReportGenerator
-from reports.csv_report import CSVReportGenerator
+from scanner import __version__
+from scanner.catalog import PLATFORMS, load_checks
+from scanner.linux_checks import DEFAULT_FIND_TIMEOUT
+from scanner.model import CATEGORIES, SEVERITIES, exit_code
+from scanner.reports import CSVReportGenerator, HTMLReportGenerator, JSONReportGenerator, POAMReportGenerator
+from scanner.runner import detect_platform, run_scan
 
-console = Console()
-
-
-def detect_os():
-    """Detect the operating system"""
-    system = platform.system().lower()
-    if system == 'linux':
-        return 'linux'
-    elif system == 'windows':
-        return 'windows'
-    else:
-        return 'unknown'
+EXIT_USAGE = 64
+FRAMEWORK_CHOICES = {"nist": "nist_800_53", "soc2": "soc2", "iso27001": "iso_27001"}
+STATUS_STYLE = {"PASS": "green", "FAIL": "red", "ERROR": "yellow", "NOT_APPLICABLE": "dim", "MANUAL": "cyan"}
+SEVERITY_STYLE = {"critical": "red", "high": "yellow", "medium": "blue", "low": "dim"}
 
 
-def display_banner():
-    """Display the application banner"""
-    banner = """
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║         AUTOMATED COMPLIANCE SCANNER v1.0.0                   ║
-    ║         CIS Benchmarks | NIST 800-53 Control Mapping          ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    """
-    console.print(Panel(banner, style="bold blue"))
+class Parser(argparse.ArgumentParser):
+    def error(self, message):  # usage errors must not look like scan results (exit 1 or 2)
+        self.print_usage(sys.stderr)
+        self.exit(EXIT_USAGE, f"{self.prog}: error: {message}\n")
 
 
-def display_console_results(results):
-    """Display results in a formatted console table"""
-    # Summary statistics
-    total = len(results['checks'])
-    passed = sum(1 for c in results['checks'] if c['status'] == 'PASS')
-    failed = sum(1 for c in results['checks'] if c['status'] == 'FAIL')
-    errors = sum(1 for c in results['checks'] if c['status'] == 'ERROR')
-
-    # Handle division by zero
-    compliance_rate = (passed / total * 100) if total > 0 else 0
-
-    # Summary panel
-    summary = f"""
-    [bold]Scan Summary[/bold]
-    ─────────────────────────────────
-    Total Checks:    {total}
-    [green]Passed:[/green]          {passed}
-    [red]Failed:[/red]          {failed}
-    [yellow]Errors:[/yellow]          {errors}
-    ─────────────────────────────────
-    [bold cyan]Compliance Rate: {compliance_rate:.1f}%[/bold cyan]
-    """
-    console.print(Panel(summary, title="Results Summary", border_style="blue"))
-
-    # Results table
-    table = Table(title="Compliance Check Results", show_header=True, header_style="bold magenta")
-    table.add_column("ID", style="cyan", width=10)
-    table.add_column("Category", style="magenta", width=15)
-    table.add_column("Check", style="white", width=45)
-    table.add_column("Status", justify="center", width=8)
-    table.add_column("Severity", justify="center", width=10)
-
-    for check in results['checks']:
-        status_color = "green" if check['status'] == 'PASS' else "red" if check['status'] == 'FAIL' else "yellow"
-        severity_color = {
-            'critical': 'red',
-            'high': 'yellow',
-            'medium': 'blue',
-            'low': 'dim'
-        }.get(check['severity'], 'white')
-
-        check_name = check['name'][:42] + '...' if len(check['name']) > 45 else check['name']
-
-        table.add_row(
-            check['id'],
-            check['category'],
-            check_name,
-            f"[{status_color}]{check['status']}[/{status_color}]",
-            f"[{severity_color}]{check['severity'].upper()}[/{severity_color}]"
-        )
-
-    console.print(table)
-
-    # Display NIST summary if available
-    if 'nist_summary' in results and results['nist_summary']:
-        display_nist_summary(results['nist_summary'])
-
-    # Display failed checks with remediation
-    failed_checks = [c for c in results['checks'] if c['status'] == 'FAIL']
-    if failed_checks:
-        console.print("\n[bold red]Failed Checks - Remediation Required[/bold red]\n")
-        for check in failed_checks:
-            console.print(f"[bold]{check['id']}[/bold]: {check['name']}")
-            console.print(f"  [dim]Current:[/dim] {check.get('actual', 'N/A')}")
-            console.print(f"  [dim]Expected:[/dim] {check.get('expected', 'N/A')}")
-            console.print(f"  [yellow]Remediation:[/yellow] {check.get('remediation', 'N/A')}")
-            console.print()
-
-
-def display_nist_summary(nist_summary):
-    """Display NIST 800-53 control coverage summary"""
-    console.print("\n[bold blue]NIST 800-53 Control Coverage[/bold blue]\n")
-
-    table = Table(show_header=True, header_style="bold cyan")
-    table.add_column("Control", width=10)
-    table.add_column("Family", width=25)
-    table.add_column("Description", width=35)
-    table.add_column("Compliance", justify="center", width=12)
-
-    for control in nist_summary.get('controls', []):
-        compliance = control.get('compliance_percentage', 0)
-        if compliance >= 80:
-            color = "green"
-        elif compliance >= 50:
-            color = "yellow"
-        else:
-            color = "red"
-
-        table.add_row(
-            control['control_id'],
-            control['control_family'],
-            control['control_name'],
-            f"[{color}]{compliance}%[/{color}]"
-        )
-
-    console.print(table)
-
-
-def main():
-    """Main entry point for the compliance scanner"""
-    parser = argparse.ArgumentParser(
-        description='Automated Compliance Scanner - CIS Benchmarks & NIST 800-53',
+def build_parser() -> Parser:
+    parser = Parser(
+        prog="compliance-scanner",
+        description="Check this host against CIS Benchmark recommendations and map the findings to "
+                    "NIST SP 800-53 Rev. 5, SOC 2 and ISO/IEC 27001:2022.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog="""Exit codes:
+  0   every assessed check passed and nothing errored
+  1   at least one check failed
+  2   at least one critical check failed
+  3   nothing failed, but at least one check could not be assessed
+  64  usage error or unsupported platform
+
 Examples:
-  %(prog)s                              Run basic scan with console output
-  %(prog)s --output html -f report.html Generate HTML report
-  %(prog)s --output json --nist-mapping Generate JSON with NIST mappings
-  %(prog)s --severity high              Only show high/critical findings
-  %(prog)s --categories authentication network  Scan specific categories
+  %(prog)s
+  %(prog)s --output html -f report.html
+  %(prog)s --output json -f report.json --quiet
+  %(prog)s --output poam -f poam.csv
+  %(prog)s --categories authentication network --severity high
+  %(prog)s --frameworks nist soc2
+  %(prog)s --list-checks --platform windows
+""")
+    parser.add_argument("--output", "-o", choices=["console", "html", "json", "csv", "poam"], default="console",
+                        help="output format (default: console)")
+    parser.add_argument("--output-file", "-f", help="file to write for html, json, csv and poam output")
+    parser.add_argument("--categories", "-c", nargs="+", choices=list(CATEGORIES),
+                        help="only run checks in these categories")
+    parser.add_argument("--severity", "-s", choices=list(SEVERITIES) + ["all"], default="all",
+                        help="only run checks at this severity or above (default: all)")
+    parser.add_argument("--frameworks", nargs="+", choices=list(FRAMEWORK_CHOICES), default=[],
+                        help="print control coverage tables for these frameworks in console output")
+    parser.add_argument("--nist-mapping", action="store_true", help="same as --frameworks nist")
+    parser.add_argument("--find-timeout", type=int, default=DEFAULT_FIND_TIMEOUT, metavar="SECONDS",
+                        help=f"time limit per file system for file searches (default: {DEFAULT_FIND_TIMEOUT})")
+    parser.add_argument("--list-checks", action="store_true", help="print the check catalog and exit")
+    parser.add_argument("--platform", choices=list(PLATFORMS), help="catalog to show with --list-checks")
+    parser.add_argument("--quiet", "-q", action="store_true", help="print nothing but the requested output")
+    parser.add_argument("--version", "-v", action="version", version=f"%(prog)s {__version__}")
+    return parser
 
-Author: Rayshaun Smith
-GitHub: https://github.com/RaySmith414
-        """
-    )
-    parser.add_argument(
-        '--output', '-o',
-        choices=['html', 'json', 'csv', 'console'],
-        default='console',
-        help='Output format (default: console)'
-    )
-    parser.add_argument(
-        '--output-file', '-f',
-        help='Output file path'
-    )
-    parser.add_argument(
-        '--categories', '-c',
-        nargs='+',
-        choices=['filesystem', 'authentication', 'network', 'logging', 'access_control', 'services'],
-        help='Specific categories to scan (e.g., authentication filesystem network)'
-    )
-    parser.add_argument(
-        '--severity', '-s',
-        choices=['critical', 'high', 'medium', 'low', 'all'],
-        default='all',
-        help='Minimum severity to report (default: all)'
-    )
-    parser.add_argument(
-        '--nist-mapping',
-        action='store_true',
-        help='Include NIST 800-53 control mappings in report'
-    )
-    parser.add_argument(
-        '--quiet', '-q',
-        action='store_true',
-        help='Suppress banner and progress output'
-    )
-    parser.add_argument(
-        '--version', '-v',
-        action='version',
-        version='%(prog)s 1.0.0'
-    )
 
-    args = parser.parse_args()
+def _rate(value) -> str:
+    return "n/a" if value is None else f"{value}%"
 
-    # Display banner unless quiet mode
-    if not args.quiet:
-        display_banner()
 
-    # Detect OS and initialize appropriate checker
-    os_type = detect_os()
+def print_catalog(console: Console, platform: str) -> None:
+    table = Table(title=f"{platform.capitalize()} checks", show_lines=False)
+    for column in ("ID", "Category", "Severity", "Needs root"):
+        table.add_column(column, no_wrap=True)
+    table.add_column("Check")
+    table.add_column("NIST 800-53")
+    for check in load_checks(platform):
+        table.add_row(check.id, check.category, check.severity, "yes" if check.requires_root else "no",
+                      check.title, ", ".join(check.nist_800_53))
+    console.print(table)
 
-    console.print(f"[dim]Scan started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}[/dim]")
-    console.print(f"[dim]Operating System: {os_type.upper()}[/dim]\n")
 
-    if os_type == 'linux':
-        checker = LinuxComplianceChecker()
-    elif os_type == 'windows':
-        checker = WindowsComplianceChecker()
-    else:
-        console.print("[red]Error: Unsupported operating system[/red]")
-        console.print("[dim]This scanner supports Linux and Windows systems.[/dim]")
-        sys.exit(1)
+def print_console_report(console: Console, result: Dict[str, Any], frameworks: List[str]) -> None:
+    summary = result["summary"]
+    console.print(f"[bold]Host:[/bold] {result['system_info']['hostname']}   "
+                  f"[bold]OS:[/bold] {result['system_info']['distribution']}   "
+                  f"[bold]Scan time (UTC):[/bold] {result['scan_time']}", highlight=False)
+    console.print(
+        f"[bold]Checks run:[/bold] {summary['total_checks']}   [green]Passed:[/green] {summary['passed']}   "
+        f"[red]Failed:[/red] {summary['failed']}   [yellow]Not assessed:[/yellow] {summary['errors']}   "
+        f"[cyan]Manual review:[/cyan] {summary['manual']}   Not applicable: {summary['not_applicable']}",
+        highlight=False)
+    console.print(f"[bold]Compliance rate (pass / assessed):[/bold] {_rate(summary['compliance_rate'])}\n",
+                  highlight=False)
 
-    # Run all checks with progress indicator
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-        transient=True
-    ) as progress:
-        progress.add_task(description="Running compliance checks...", total=None)
-        results = checker.run_all_checks(
-            categories=args.categories,
-            min_severity=args.severity
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("ID", no_wrap=True)
+    table.add_column("Check")
+    table.add_column("Severity", no_wrap=True)
+    table.add_column("Status", no_wrap=True)
+    for check in result["checks"]:
+        status = check["status"]
+        table.add_row(
+            check["id"], check["title"],
+            f"[{SEVERITY_STYLE[check['severity']]}]{check['severity'].upper()}[/]",
+            f"[{STATUS_STYLE[status]}]{status.replace('_', ' ')}[/]",
         )
+    console.print(table)
 
-    # Add NIST mappings if requested
-    if args.nist_mapping:
-        console.print("[dim]Adding NIST 800-53 control mappings...[/dim]")
-        mapper = NISTMapper()
-        results = mapper.add_nist_mappings(results)
+    for key in frameworks:
+        section = result["framework_summary"][key]
+        coverage = Table(title=f"{section['label']}: control coverage", header_style="bold")
+        for column in ("Control", "Name", "Passed", "Failed", "No verdict", "Compliance"):
+            coverage.add_column(column)
+        for control in section["controls"]:
+            coverage.add_row(control["control_id"], control["control_name"], str(control["checks_passed"]),
+                             str(control["checks_failed"]), str(control["checks_no_verdict"]),
+                             _rate(control["compliance_percentage"]))
+        console.print(coverage)
 
-    # Generate output based on format
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    for status, heading in (("FAIL", "Failed checks"), ("MANUAL", "Manual review"), ("ERROR", "Not assessed")):
+        rows = [c for c in result["checks"] if c["status"] == status]
+        if not rows:
+            continue
+        console.print(f"\n[bold {STATUS_STYLE[status]}]{heading} ({len(rows)})[/]")
+        for check in rows:
+            cis = f" (CIS {check['cis']['id']})" if check["cis"]["id"] else ""
+            console.print(f"[bold]{check['id']}[/bold]{cis} {check['title']}", highlight=False)
+            console.print(f"  Found:    {check['actual']}", highlight=False, markup=False)
+            if status != "ERROR":
+                console.print(f"  Expected: {check['expected']}", highlight=False, markup=False)
+                console.print(f"  Fix:      {check['remediation']}", highlight=False, markup=False)
 
-    if args.output == 'console':
-        display_console_results(results)
-    elif args.output == 'html':
-        generator = HTMLReportGenerator()
-        report_path = args.output_file or f'compliance_report_{timestamp}.html'
-        generator.generate(results, report_path)
-        console.print(f"\n[green]HTML report saved to: {report_path}[/green]")
-    elif args.output == 'json':
-        generator = JSONReportGenerator()
-        report_path = args.output_file or f'compliance_report_{timestamp}.json'
-        generator.generate(results, report_path)
-        console.print(f"\n[green]JSON report saved to: {report_path}[/green]")
-    elif args.output == 'csv':
-        generator = CSVReportGenerator()
-        report_path = args.output_file or f'compliance_report_{timestamp}.csv'
-        generator.generate(results, report_path)
-        console.print(f"\n[green]CSV report saved to: {report_path}[/green]")
 
-    # Return exit code based on results
-    failed_count = sum(1 for c in results['checks'] if c['status'] == 'FAIL')
-    critical_failed = sum(1 for c in results['checks']
-                         if c['status'] == 'FAIL' and c['severity'] == 'critical')
+def closing_line(result: Dict[str, Any]) -> str:
+    summary = result["summary"]
+    code = exit_code(result["checks"])
+    if code == 2:
+        return f"[bold red]{summary['failed_by_severity']['critical']} critical check(s) failed.[/]"
+    if code == 1:
+        return f"[bold red]{summary['failed']} check(s) failed.[/]"
+    if code == 3:
+        return (f"[bold yellow]No check failed, but {summary['errors']} could not be assessed. "
+                "This is not a clean result.[/]")
+    extra = f" {summary['manual']} need manual review." if summary["manual"] else ""
+    return f"[bold green]All {summary['passed']} assessed checks passed.[/]{extra}"
 
-    if critical_failed > 0:
-        console.print(f"\n[bold red]WARNING: {critical_failed} critical check(s) failed![/bold red]")
-        sys.exit(2)
-    elif failed_count > 0:
-        sys.exit(1)
+
+def main(argv: Optional[List[str]] = None) -> int:
+    args = build_parser().parse_args(argv)
+    console = Console()
+    notes = Console(stderr=True, quiet=args.quiet)
+
+    if args.list_checks:
+        platform = args.platform or detect_platform()
+        if platform not in PLATFORMS:
+            platform = "linux"
+        print_catalog(console, platform)
+        return 0
+
+    platform = detect_platform()
+    if platform not in PLATFORMS:
+        Console(stderr=True).print("[red]Unsupported operating system.[/red] The scanner runs on Linux and Windows.")
+        return EXIT_USAGE
+    if args.output != "console" and not args.output_file:
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        extension = "csv" if args.output in ("csv", "poam") else args.output
+        prefix = "poam" if args.output == "poam" else "compliance_report"
+        args.output_file = f"{prefix}_{stamp}.{extension}"
+
+    notes.print(f"Automated Compliance Scanner {__version__} on {platform}", highlight=False)
+    with notes.status("Running checks..."):
+        result = run_scan(platform, args.categories, args.severity, find_timeout=args.find_timeout)
+    if not result["privileged"]:
+        rights = "root" if platform == "linux" else "administrator rights"
+        notes.print(f"[yellow]Running without {rights}. Checks that need them are reported as ERROR.[/yellow]")
+
+    frameworks = [FRAMEWORK_CHOICES[name] for name in args.frameworks]
+    if args.nist_mapping and "nist_800_53" not in frameworks:
+        frameworks.insert(0, "nist_800_53")
+
+    if args.output == "console":
+        print_console_report(console, result, frameworks)
+    elif args.output == "html":
+        HTMLReportGenerator().generate(result, args.output_file)
+        notes.print(f"HTML report written to {args.output_file}", highlight=False)
+    elif args.output == "json":
+        JSONReportGenerator().generate(result, args.output_file)
+        notes.print(f"JSON report written to {args.output_file}", highlight=False)
+    elif args.output == "csv":
+        written = CSVReportGenerator().generate(result, args.output_file)
+        notes.print(f"CSV reports written to {' and '.join(written)}", highlight=False)
     else:
-        console.print("\n[bold green]All checks passed![/bold green]")
-        sys.exit(0)
+        count = POAMReportGenerator().generate(result, args.output_file)
+        notes.print(f"POA&M worksheet with {count} open item(s) written to {args.output_file}", highlight=False)
+
+    notes.print(closing_line(result))
+    return exit_code(result["checks"])
 
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    sys.exit(main())

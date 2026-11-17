@@ -1,708 +1,538 @@
-"""
-Windows CIS Benchmark Compliance Checks
-Based on CIS Benchmark for Microsoft Windows Server 2019/2022
+"""Windows check logic.
 
-Author: Rayshaun Smith
-GitHub: https://github.com/RaySmith414
+Titles, severities, remediation text and framework mappings live in
+scanner/data/checks_windows.yaml. This module holds only the test for each
+check. The rules in scanner/linux_checks.py apply here too: a state that could
+not be read is never reported as PASS or as a default value.
+
+Every query runs through PowerShell and returns JSON, so the decision logic in
+Python can be tested with recorded output on any platform.
 """
 
+import csv
+import io
+import json
 import os
-import subprocess
-import re
-from typing import Dict, List, Optional
-from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from scanner.model import NotApplicable, Outcome, Unassessable, failed, manual, passed
 
 
-class WindowsComplianceChecker:
-    """Performs CIS Benchmark compliance checks on Windows systems"""
+def powershell_executable() -> str:
+    """Path of Windows PowerShell.
 
-    def __init__(self):
-        self.results = {
-            'system_info': self._get_system_info(),
-            'scan_time': None,
-            'checks': []
-        }
+    On Windows this is the absolute path under %SystemRoot%. A bare name would let
+    a powershell.exe planted in the working directory run with the scanner's
+    rights, because Windows searches that directory before PATH. Sysnative comes
+    first so that a 32-bit Python on 64-bit Windows still reads the 64-bit
+    registry view.
+    """
+    root = os.environ.get("SystemRoot")
+    if os.name == "nt" and root:
+        for system_dir in ("Sysnative", "System32"):
+            candidate = os.path.join(root, system_dir, "WindowsPowerShell", "v1.0", "powershell.exe")
+            if os.path.isfile(candidate):
+                return candidate
+    return "powershell"
 
-        # Define all checks with metadata
-        self.checks = {
-            'filesystem': [
-                ('FS-001', 'Ensure NTFS file system is used on all partitions', 'high', self.check_ntfs_filesystem),
-                ('FS-002', 'Ensure permissions on system files are configured', 'high', self.check_system_file_permissions),
-            ],
-            'authentication': [
-                ('AUTH-001', 'Ensure password history is configured', 'high', self.check_password_history),
-                ('AUTH-002', 'Ensure maximum password age is 365 days or less', 'high', self.check_password_max_age),
-                ('AUTH-003', 'Ensure minimum password age is configured', 'medium', self.check_password_min_age),
-                ('AUTH-004', 'Ensure minimum password length is 14 or more', 'high', self.check_password_length),
-                ('AUTH-005', 'Ensure password complexity is enabled', 'high', self.check_password_complexity),
-                ('AUTH-006', 'Ensure account lockout threshold is configured', 'high', self.check_account_lockout),
-                ('AUTH-007', 'Ensure account lockout duration is configured', 'medium', self.check_lockout_duration),
-                ('AUTH-008', 'Ensure Guest account is disabled', 'critical', self.check_guest_disabled),
-                ('AUTH-009', 'Ensure Administrator account is renamed', 'medium', self.check_admin_renamed),
-                ('AUTH-010', 'Ensure Remote Desktop requires NLA', 'high', self.check_rdp_nla),
-            ],
-            'network': [
-                ('NET-001', 'Ensure Windows Firewall is enabled for all profiles', 'critical', self.check_firewall_enabled),
-                ('NET-002', 'Ensure SMBv1 is disabled', 'critical', self.check_smbv1_disabled),
-                ('NET-003', 'Ensure NetBIOS over TCP/IP is disabled', 'medium', self.check_netbios_disabled),
-                ('NET-004', 'Ensure LLMNR is disabled', 'medium', self.check_llmnr_disabled),
-                ('NET-005', 'Ensure WinRM is securely configured', 'high', self.check_winrm_secure),
-            ],
-            'logging': [
-                ('LOG-001', 'Ensure audit policy for logon events is configured', 'high', self.check_audit_logon),
-                ('LOG-002', 'Ensure audit policy for account management is configured', 'high', self.check_audit_account_mgmt),
-                ('LOG-003', 'Ensure audit policy for privilege use is configured', 'medium', self.check_audit_privilege_use),
-                ('LOG-004', 'Ensure Security event log size is configured', 'medium', self.check_security_log_size),
-                ('LOG-005', 'Ensure Event Log Service is running', 'high', self.check_event_log_service),
-            ],
-            'access_control': [
-                ('AC-001', 'Ensure UAC is enabled', 'critical', self.check_uac_enabled),
-                ('AC-002', 'Ensure UAC elevation prompts for administrators', 'high', self.check_uac_admin_prompt),
-                ('AC-003', 'Ensure local Administrator group membership is restricted', 'high', self.check_admin_group),
-                ('AC-004', 'Ensure anonymous SID enumeration is disabled', 'medium', self.check_anonymous_sid),
-                ('AC-005', 'Ensure null session shares are restricted', 'high', self.check_null_sessions),
-            ],
-            'services': [
-                ('SVC-001', 'Ensure Telnet service is disabled', 'critical', self.check_telnet_disabled),
-                ('SVC-002', 'Ensure FTP service is disabled (unless required)', 'high', self.check_ftp_disabled),
-                ('SVC-003', 'Ensure Print Spooler is disabled on domain controllers', 'high', self.check_print_spooler),
-                ('SVC-004', 'Ensure Remote Registry service is disabled', 'medium', self.check_remote_registry),
-                ('SVC-005', 'Ensure SNMP service is disabled (unless required)', 'medium', self.check_snmp_disabled),
-            ]
-        }
 
-    def _get_system_info(self) -> Dict:
-        """Gather Windows system information"""
-        info = {
-            'hostname': 'Unknown',
-            'kernel': 'Windows',
-            'distribution': 'Microsoft Windows',
-            'architecture': 'x86_64'
-        }
+POWERSHELL = [powershell_executable(), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"]
 
+# SIDs that are the same on every Windows language edition.
+SID_EVERYONE = "S-1-1-0"
+SID_AUTHENTICATED_USERS = "S-1-5-11"
+SID_USERS = "S-1-5-32-545"
+BROAD_SIDS = {SID_EVERYONE: "Everyone", SID_AUTHENTICATED_USERS: "Authenticated Users", SID_USERS: "Users"}
+
+# FileSystemRights bits that let a principal change a folder or its content.
+WRITE_RIGHTS = (
+    0x2          # WriteData / CreateFiles
+    | 0x4        # AppendData / CreateDirectories
+    | 0x10       # WriteExtendedAttributes
+    | 0x40       # DeleteSubdirectoriesAndFiles
+    | 0x100      # WriteAttributes
+    | 0x10000    # Delete
+    | 0x40000    # ChangePermissions
+    | 0x80000    # TakeOwnership
+    | 0x10000000  # GENERIC_ALL
+    | 0x40000000  # GENERIC_WRITE
+)
+
+# Advanced audit policy subcategory GUIDs (identical on every language edition).
+AUDIT_LOGON = "{0CCE9215-69AE-11D9-BED3-505054503030}"
+AUDIT_USER_ACCOUNT_MANAGEMENT = "{0CCE9235-69AE-11D9-BED3-505054503030}"
+AUDIT_SENSITIVE_PRIVILEGE_USE = "{0CCE9228-69AE-11D9-BED3-505054503030}"
+
+PS_IS_ADMIN = (
+    "[bool](([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent())"
+    ".IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) | ConvertTo-Json"
+)
+
+PS_SECURITY_POLICY = r"""
+$ErrorActionPreference = 'Stop'
+$f = Join-Path $env:TEMP ('secpol_' + [guid]::NewGuid().ToString('N') + '.inf')
+try {
+  secedit.exe /export /cfg $f /areas SECURITYPOLICY | Out-Null
+  if (-not (Test-Path -LiteralPath $f)) { throw 'secedit produced no file' }
+  $map = @{}
+  foreach ($line in Get-Content -LiteralPath $f) {
+    if ($line -match '^\s*([^=\[\]]+?)\s*=\s*(.*)$') { $map[$matches[1].Trim()] = $matches[2].Trim() }
+  }
+  $map | ConvertTo-Json -Compress
+} finally {
+  if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Force }
+}
+"""
+
+PS_REGISTRY_VALUE = r"""
+$ErrorActionPreference = 'Stop'
+$p = '%(path)s'; $n = '%(name)s'
+if (-not (Test-Path -LiteralPath $p)) { @{found=$false} | ConvertTo-Json -Compress; exit 0 }
+$item = Get-ItemProperty -LiteralPath $p
+if ($null -eq $item.PSObject.Properties[$n]) { @{found=$false} | ConvertTo-Json -Compress; exit 0 }
+@{found=$true; value=$item.$n} | ConvertTo-Json -Compress
+"""
+
+PS_SERVICE = r"""
+$s = Get-Service -Name '%(name)s' -ErrorAction SilentlyContinue
+if ($null -eq $s) { @{exists=$false} | ConvertTo-Json -Compress }
+else { @{exists=$true; status=$s.Status.ToString(); start_type=$s.StartType.ToString()} | ConvertTo-Json -Compress }
+"""
+
+PS_VOLUMES = r"""
+$ErrorActionPreference = 'Stop'
+$v = @(Get-Volume | Where-Object { $_.DriveLetter -and $_.DriveType -eq 'Fixed' } | ForEach-Object {
+  $fs = if ($_.FileSystem) { [string]$_.FileSystem } else { [string]$_.FileSystemType }
+  @{drive=[string]$_.DriveLetter; fs=$fs} })
+ConvertTo-Json -InputObject $v -Compress
+"""
+
+PS_CONFIG_ACL = r"""
+$ErrorActionPreference = 'Stop'
+$acl = Get-Acl -LiteralPath (Join-Path $env:SystemRoot 'System32\config')
+$out = @(foreach ($ace in $acl.Access) {
+  $sid = try { $ace.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+         catch { [string]$ace.IdentityReference }
+  @{sid=$sid; type=[string]$ace.AccessControlType; rights=[int]$ace.FileSystemRights}
+})
+ConvertTo-Json -InputObject $out -Compress
+"""
+
+PS_FIREWALL = r"""
+$ErrorActionPreference = 'Stop'
+$p = @(Get-NetFirewallProfile -PolicyStore ActiveStore | ForEach-Object {
+  @{name=[string]$_.Name; enabled=[string]$_.Enabled} })
+ConvertTo-Json -InputObject $p -Compress
+"""
+
+PS_SMB1 = r"""
+$ErrorActionPreference = 'Stop'
+[bool](Get-SmbServerConfiguration).EnableSMB1Protocol | ConvertTo-Json
+"""
+
+PS_NETBIOS = r"""
+$ErrorActionPreference = 'Stop'
+$a = @(Get-CimInstance -ClassName Win32_NetworkAdapterConfiguration -Filter 'IPEnabled = TRUE' | ForEach-Object {
+  @{adapter=[string]$_.Description; option=[int]$_.TcpipNetbiosOptions} })
+ConvertTo-Json -InputObject $a -Compress
+"""
+
+PS_WINRM_ALLOW_UNENCRYPTED = r"""
+$ErrorActionPreference = 'Stop'
+[string](Get-Item -Path WSMan:\localhost\Service\AllowUnencrypted).Value | ConvertTo-Json
+"""
+
+PS_AUDITPOL = "auditpol.exe /get /subcategory:'%(guid)s' /r"
+
+PS_SECURITY_LOG_SIZE = r"""
+$ErrorActionPreference = 'Stop'
+[long](Get-WinEvent -ListLog Security).MaximumSizeInBytes | ConvertTo-Json
+"""
+
+PS_ADMINISTRATORS = r"""
+$ErrorActionPreference = 'Stop'
+$m = @(Get-LocalGroupMember -SID 'S-1-5-32-544' | ForEach-Object {
+  @{name=[string]$_.Name; kind=[string]$_.ObjectClass} })
+ConvertTo-Json -InputObject $m -Compress
+"""
+
+PS_DOMAIN_ROLE = r"""
+$ErrorActionPreference = 'Stop'
+[int](Get-CimInstance -ClassName Win32_ComputerSystem).DomainRole | ConvertTo-Json
+"""
+
+
+def _last_line(text: str) -> str:
+    lines = [line.strip() for line in text.strip().splitlines() if line.strip()]
+    return lines[-1] if lines else ""
+
+
+def _error_detail(result) -> str:
+    """The message line of a failed command, without the position lines PowerShell adds."""
+    lines = [line.strip() for line in result.stderr.splitlines()]
+    message = " ".join(line for line in lines
+                       if line and not line.startswith(("#< CLIXML", "<Objs", "At line:", "+ ")))
+    return (message or _last_line(result.stdout))[:300]
+
+
+def _unwrap(data: Any) -> Any:
+    """Windows PowerShell 5.1 can serialize an array as {"value": [...], "Count": n}."""
+    if isinstance(data, dict) and set(data) == {"value", "Count"} and isinstance(data["value"], list):
+        return data["value"]
+    return data
+
+
+def _as_int(value: Any, what: str) -> int:
+    try:
+        return int(str(value).strip().strip('"'))
+    except (TypeError, ValueError) as exc:
+        raise Unassessable(f"{what} is not a number: {value!r}") from exc
+
+
+def has_write_rights(rights: int) -> bool:
+    """True when a FileSystemRights value includes any right that modifies data."""
+    return bool(rights & WRITE_RIGHTS)
+
+
+class WindowsChecks:
+    """One method per `function` in checks_windows.yaml."""
+
+    platform = "windows"
+
+    def __init__(self, probe):
+        self.probe = probe
+        self._policy: Optional[Dict[str, str]] = None
+        self._admin: Optional[bool] = None
+
+    # ----------------------------------------------------------- shared readers
+
+    def _ps_json(self, script: str, what: str, timeout: int = 60) -> Any:
+        result = self.probe.run(POWERSHELL + [script], timeout=timeout)
+        if result.missing:
+            raise Unassessable("PowerShell is not available")
+        if result.timed_out:
+            raise Unassessable(f"{what} timed out")
+        if not result.ok:
+            detail = _error_detail(result)
+            raise Unassessable(f"{what} failed" + (f": {detail}" if detail else ""))
+        text = result.stdout.strip()
+        if not text:
+            raise Unassessable(f"{what} returned no data")
         try:
-            import platform
-            info['hostname'] = platform.node()
-            info['distribution'] = f"{platform.system()} {platform.release()}"
-            info['kernel'] = platform.version()
-            info['architecture'] = platform.machine()
-        except Exception:
-            pass
+            return _unwrap(json.loads(text))
+        except ValueError as exc:
+            raise Unassessable(f"{what} returned output that is not JSON") from exc
 
-        return info
+    def is_privileged(self) -> bool:
+        if self._admin is None:
+            try:
+                self._admin = bool(self._ps_json(PS_IS_ADMIN, "the administrator check"))
+            except Unassessable:
+                self._admin = False
+        return self._admin
 
-    def _run_powershell(self, command: str) -> tuple:
-        """Execute a PowerShell command and return output"""
-        try:
-            result = subprocess.run(
-                ['powershell', '-NoProfile', '-Command', command],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            return result.returncode, result.stdout.strip(), result.stderr.strip()
-        except subprocess.TimeoutExpired:
-            return -1, '', 'Command timed out'
-        except FileNotFoundError:
-            return -1, '', 'PowerShell not found'
-        except Exception as e:
-            return -1, '', str(e)
+    def _security_policy(self) -> Dict[str, str]:
+        if self._policy is None:
+            data = self._ps_json(PS_SECURITY_POLICY, "the security policy export (secedit)")
+            if not isinstance(data, dict):
+                raise Unassessable("the security policy export returned an unexpected shape")
+            self._policy = {str(k): str(v) for k, v in data.items()}
+        return self._policy
 
-    def _run_command(self, command: str) -> tuple:
-        """Execute a command and return output"""
-        try:
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            return result.returncode, result.stdout.strip(), result.stderr.strip()
-        except subprocess.TimeoutExpired:
-            return -1, '', 'Command timed out'
-        except Exception as e:
-            return -1, '', str(e)
+    def _policy_int(self, key: str) -> Optional[int]:
+        raw = self._security_policy().get(key)
+        return None if raw is None else _as_int(raw, key)
 
-    def _get_security_policy(self, setting: str) -> Optional[str]:
-        """Get a security policy setting value"""
-        code, output, _ = self._run_powershell(
-            f"secedit /export /cfg $env:TEMP\\secpol.cfg /quiet; "
-            f"Select-String -Path $env:TEMP\\secpol.cfg -Pattern '{setting}'"
-        )
-        if output and '=' in output:
-            return output.split('=')[-1].strip()
-        return None
+    def _registry(self, path: str, name: str) -> Optional[Any]:
+        """Registry value. None when the key or the value does not exist."""
+        data = self._ps_json(PS_REGISTRY_VALUE % {"path": path, "name": name}, f"reading {name} from the registry")
+        if not isinstance(data, dict) or "found" not in data:
+            raise Unassessable(f"reading {name} from the registry returned an unexpected shape")
+        return data.get("value") if data["found"] else None
 
-    def _check_service_status(self, service_name: str) -> Dict:
-        """Check Windows service status"""
-        code, output, _ = self._run_powershell(
-            f"Get-Service -Name '{service_name}' -ErrorAction SilentlyContinue | "
-            "Select-Object -Property Status, StartType | ConvertTo-Json"
-        )
-        try:
-            import json
-            data = json.loads(output) if output else {}
-            return {
-                'exists': bool(output),
-                'status': data.get('Status', 'Unknown'),
-                'start_type': data.get('StartType', 'Unknown')
-            }
-        except (json.JSONDecodeError, ValueError):
-            return {'exists': False, 'status': 'Unknown', 'start_type': 'Unknown'}
+    def _service(self, name: str) -> Dict[str, Any]:
+        data = self._ps_json(PS_SERVICE % {"name": name}, f"the {name} service query")
+        if not isinstance(data, dict) or "exists" not in data:
+            raise Unassessable(f"the {name} service query returned an unexpected shape")
+        return data
 
-    # ==================== FILESYSTEM CHECKS ====================
+    def _service_disabled(self, name: str, label: str) -> Outcome:
+        service = self._service(name)
+        if not service["exists"]:
+            return passed(f"the {label} service is not installed")
+        actual = f"{label} service start type: {service.get('start_type')}, status: {service.get('status')}"
+        return passed(actual) if service.get("start_type") == "Disabled" else failed(actual)
 
-    def check_ntfs_filesystem(self) -> Dict:
-        """CIS 2.3.1.1 - Ensure NTFS file system is used on all partitions"""
-        code, output, _ = self._run_powershell(
-            "Get-Volume | Where-Object {$_.DriveLetter} | "
-            "Select-Object DriveLetter, FileSystemType | ConvertTo-Json"
-        )
-        all_ntfs = True
-        non_ntfs = []
-        try:
-            import json
-            volumes = json.loads(output) if output else []
-            if isinstance(volumes, dict):
-                volumes = [volumes]
-            for vol in volumes:
-                if vol.get('FileSystemType') not in ['NTFS', 'ReFS']:
-                    all_ntfs = False
-                    non_ntfs.append(vol.get('DriveLetter', '?'))
-        except (json.JSONDecodeError, ValueError):
-            pass
+    def _audit_setting(self, guid: str, label: str) -> Outcome:
+        result = self.probe.run(POWERSHELL + [PS_AUDITPOL % {"guid": guid}], timeout=60).require_ran()
+        if not result.ok:
+            detail = _error_detail(result)
+            raise Unassessable("auditpol failed" + (f": {detail}" if detail else ""))
+        rows = [row for row in csv.reader(io.StringIO(result.stdout)) if row]
+        if len(rows) < 2 or len(rows[1]) < 5:
+            raise Unassessable("auditpol returned no row for the subcategory")
+        setting = rows[1][4].strip()
+        if setting == "Success and Failure":
+            return passed(f"{label}: {setting}")
+        if setting in ("Success", "Failure", "No Auditing"):
+            return failed(f"{label}: {setting}")
+        raise Unassessable(f"auditpol returned a setting this scanner does not recognize: {setting!r}")
 
-        return {
-            'passed': all_ntfs,
-            'actual': 'All drives use NTFS/ReFS' if all_ntfs else f'Non-NTFS drives: {", ".join(non_ntfs)}',
-            'expected': 'All partitions should use NTFS file system',
-            'remediation': 'Convert partitions to NTFS using convert command'
-        }
+    # --------------------------------------------------------------- filesystem
 
-    def check_system_file_permissions(self) -> Dict:
-        """Check system file permissions are properly configured"""
-        code, output, _ = self._run_powershell(
-            "icacls C:\\Windows\\System32\\config 2>$null | Select-String 'Successfully'"
-        )
-        passed = code == 0
-        return {
-            'passed': passed,
-            'actual': 'System file permissions accessible' if passed else 'Unable to verify permissions',
-            'expected': 'System file permissions should be properly configured',
-            'remediation': 'Review and correct permissions on C:\\Windows\\System32\\config'
-        }
+    def fixed_volumes_use_ntfs(self) -> Outcome:
+        volumes = self._ps_json(PS_VOLUMES, "the volume query")
+        if not isinstance(volumes, list):
+            raise Unassessable("the volume query returned an unexpected shape")
+        if not volumes:
+            raise Unassessable("no fixed volume with a drive letter was reported")
+        other = [f"{v.get('drive')}: ({v.get('fs') or 'unknown'})" for v in volumes
+                 if str(v.get("fs", "")).upper() not in ("NTFS", "REFS")]
+        if other:
+            return failed(f"volumes not on NTFS or ReFS: {', '.join(other)}")
+        return passed(f"{len(volumes)} fixed volumes, all NTFS or ReFS")
 
-    # ==================== AUTHENTICATION CHECKS ====================
-
-    def check_password_history(self) -> Dict:
-        """CIS 1.1.1 - Ensure password history is configured"""
-        code, output, _ = self._run_powershell(
-            "net accounts | Select-String 'Length of password history'"
-        )
-        try:
-            history = int(re.search(r'(\d+)', output).group(1)) if output else 0
-            passed = history >= 24
-        except (AttributeError, ValueError):
-            history = 'Unable to parse'
-            passed = False
-        return {
-            'passed': passed,
-            'actual': f'Password history: {history}',
-            'expected': 'Password history should be 24 or more',
-            'remediation': 'Set "Enforce password history" to 24 in Group Policy'
-        }
-
-    def check_password_max_age(self) -> Dict:
-        """CIS 1.1.2 - Ensure maximum password age is 365 days or less"""
-        code, output, _ = self._run_powershell(
-            "net accounts | Select-String 'Maximum password age'"
-        )
-        try:
-            if 'Never' in output:
-                days = 99999
-            else:
-                days = int(re.search(r'(\d+)', output).group(1)) if output else 99999
-            passed = days <= 365
-        except (AttributeError, ValueError):
-            days = 'Unable to parse'
-            passed = False
-        return {
-            'passed': passed,
-            'actual': f'Maximum password age: {days} days',
-            'expected': 'Maximum password age <= 365 days',
-            'remediation': 'Set "Maximum password age" to 365 or less in Group Policy'
-        }
-
-    def check_password_min_age(self) -> Dict:
-        """CIS 1.1.3 - Ensure minimum password age is configured"""
-        code, output, _ = self._run_powershell(
-            "net accounts | Select-String 'Minimum password age'"
-        )
-        try:
-            days = int(re.search(r'(\d+)', output).group(1)) if output else 0
-            passed = days >= 1
-        except (AttributeError, ValueError):
-            days = 'Unable to parse'
-            passed = False
-        return {
-            'passed': passed,
-            'actual': f'Minimum password age: {days} days',
-            'expected': 'Minimum password age >= 1 day',
-            'remediation': 'Set "Minimum password age" to 1 or more in Group Policy'
-        }
-
-    def check_password_length(self) -> Dict:
-        """CIS 1.1.4 - Ensure minimum password length is 14 or more"""
-        code, output, _ = self._run_powershell(
-            "net accounts | Select-String 'Minimum password length'"
-        )
-        try:
-            length = int(re.search(r'(\d+)', output).group(1)) if output else 0
-            passed = length >= 14
-        except (AttributeError, ValueError):
-            length = 'Unable to parse'
-            passed = False
-        return {
-            'passed': passed,
-            'actual': f'Minimum password length: {length}',
-            'expected': 'Minimum password length >= 14',
-            'remediation': 'Set "Minimum password length" to 14 in Group Policy'
-        }
-
-    def check_password_complexity(self) -> Dict:
-        """CIS 1.1.5 - Ensure password complexity is enabled"""
-        code, output, _ = self._run_powershell(
-            "Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Netlogon\\Parameters' "
-            "-Name 'RequireStrongKey' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty RequireStrongKey"
-        )
-        # Note: Actual check requires secedit, simplified here
-        passed = True  # Assume pass if we can't determine
-        return {
-            'passed': passed,
-            'actual': 'Password complexity check performed',
-            'expected': 'Password complexity should be enabled',
-            'remediation': 'Enable "Password must meet complexity requirements" in Group Policy'
-        }
-
-    def check_account_lockout(self) -> Dict:
-        """CIS 1.2.1 - Ensure account lockout threshold is configured"""
-        code, output, _ = self._run_powershell(
-            "net accounts | Select-String 'Lockout threshold'"
-        )
-        try:
-            if 'Never' in output:
-                threshold = 0
-            else:
-                threshold = int(re.search(r'(\d+)', output).group(1)) if output else 0
-            passed = 1 <= threshold <= 5
-        except (AttributeError, ValueError):
-            threshold = 'Unable to parse'
-            passed = False
-        return {
-            'passed': passed,
-            'actual': f'Lockout threshold: {threshold}',
-            'expected': 'Lockout threshold between 1 and 5',
-            'remediation': 'Set "Account lockout threshold" to 5 or fewer in Group Policy'
-        }
-
-    def check_lockout_duration(self) -> Dict:
-        """CIS 1.2.2 - Ensure account lockout duration is configured"""
-        code, output, _ = self._run_powershell(
-            "net accounts | Select-String 'Lockout duration'"
-        )
-        try:
-            duration = int(re.search(r'(\d+)', output).group(1)) if output else 0
-            passed = duration >= 15
-        except (AttributeError, ValueError):
-            duration = 'Unable to parse'
-            passed = False
-        return {
-            'passed': passed,
-            'actual': f'Lockout duration: {duration} minutes',
-            'expected': 'Lockout duration >= 15 minutes',
-            'remediation': 'Set "Account lockout duration" to 15 or more in Group Policy'
-        }
-
-    def check_guest_disabled(self) -> Dict:
-        """CIS 1.1.2 - Ensure Guest account is disabled"""
-        code, output, _ = self._run_powershell(
-            "Get-LocalUser -Name 'Guest' -ErrorAction SilentlyContinue | "
-            "Select-Object -ExpandProperty Enabled"
-        )
-        passed = output.lower() == 'false'
-        return {
-            'passed': passed,
-            'actual': f'Guest account enabled: {output}',
-            'expected': 'Guest account should be disabled',
-            'remediation': 'Disable Guest account: net user Guest /active:no'
-        }
-
-    def check_admin_renamed(self) -> Dict:
-        """CIS 2.3.1.5 - Ensure Administrator account is renamed"""
-        code, output, _ = self._run_powershell(
-            "Get-LocalUser | Where-Object {$_.SID -like 'S-1-5-*-500'} | "
-            "Select-Object -ExpandProperty Name"
-        )
-        passed = output.lower() != 'administrator'
-        return {
-            'passed': passed,
-            'actual': f'Administrator account name: {output}',
-            'expected': 'Administrator account should be renamed',
-            'remediation': 'Rename Administrator account in Local Security Policy'
-        }
-
-    def check_rdp_nla(self) -> Dict:
-        """CIS 18.9.65.3.9.1 - Ensure Remote Desktop requires NLA"""
-        code, output, _ = self._run_powershell(
-            "Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' "
-            "-Name 'UserAuthentication' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty UserAuthentication"
-        )
-        passed = output == '1'
-        return {
-            'passed': passed,
-            'actual': f'NLA enabled: {output == "1"}',
-            'expected': 'Network Level Authentication should be required',
-            'remediation': 'Enable NLA for Remote Desktop in System Properties'
-        }
-
-    # ==================== NETWORK CHECKS ====================
-
-    def check_firewall_enabled(self) -> Dict:
-        """CIS 9.1.1 - Ensure Windows Firewall is enabled for all profiles"""
-        code, output, _ = self._run_powershell(
-            "Get-NetFirewallProfile | Select-Object Name, Enabled | ConvertTo-Json"
-        )
-        all_enabled = True
-        disabled_profiles = []
-        try:
-            import json
-            profiles = json.loads(output) if output else []
-            if isinstance(profiles, dict):
-                profiles = [profiles]
-            for profile in profiles:
-                if not profile.get('Enabled', False):
-                    all_enabled = False
-                    disabled_profiles.append(profile.get('Name', 'Unknown'))
-        except (json.JSONDecodeError, ValueError):
-            all_enabled = False
-
-        return {
-            'passed': all_enabled,
-            'actual': 'All profiles enabled' if all_enabled else f'Disabled: {", ".join(disabled_profiles)}',
-            'expected': 'Windows Firewall should be enabled for all profiles',
-            'remediation': 'Enable Windows Firewall: Set-NetFirewallProfile -All -Enabled True'
-        }
-
-    def check_smbv1_disabled(self) -> Dict:
-        """CIS 18.3.3 - Ensure SMBv1 is disabled"""
-        code, output, _ = self._run_powershell(
-            "Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -ErrorAction SilentlyContinue | "
-            "Select-Object -ExpandProperty State"
-        )
-        passed = output == 'Disabled' or output == ''
-        return {
-            'passed': passed,
-            'actual': f'SMBv1 state: {output if output else "Not installed"}',
-            'expected': 'SMBv1 should be disabled',
-            'remediation': 'Disable SMBv1: Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol'
-        }
-
-    def check_netbios_disabled(self) -> Dict:
-        """CIS 18.5.4.1 - Ensure NetBIOS over TCP/IP is disabled"""
-        code, output, _ = self._run_powershell(
-            "Get-WmiObject Win32_NetworkAdapterConfiguration | "
-            "Where-Object {$_.TcpipNetbiosOptions -eq 2} | Measure-Object | "
-            "Select-Object -ExpandProperty Count"
-        )
-        # If count matches total adapters, all are disabled
-        passed = True  # Simplified check
-        return {
-            'passed': passed,
-            'actual': 'NetBIOS configuration checked',
-            'expected': 'NetBIOS over TCP/IP should be disabled',
-            'remediation': 'Disable NetBIOS in adapter properties or via DHCP'
-        }
-
-    def check_llmnr_disabled(self) -> Dict:
-        """CIS 18.5.4.2 - Ensure LLMNR is disabled"""
-        code, output, _ = self._run_powershell(
-            "Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient' "
-            "-Name 'EnableMulticast' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty EnableMulticast"
-        )
-        passed = output == '0'
-        return {
-            'passed': passed,
-            'actual': f'LLMNR enabled: {output != "0"}',
-            'expected': 'LLMNR should be disabled',
-            'remediation': 'Disable LLMNR via Group Policy: Turn off multicast name resolution'
-        }
-
-    def check_winrm_secure(self) -> Dict:
-        """Ensure WinRM is securely configured"""
-        code, output, _ = self._run_powershell(
-            "Get-Item WSMan:\\localhost\\Service\\AllowUnencrypted -ErrorAction SilentlyContinue | "
-            "Select-Object -ExpandProperty Value"
-        )
-        passed = output.lower() == 'false'
-        return {
-            'passed': passed,
-            'actual': f'WinRM unencrypted allowed: {output}',
-            'expected': 'WinRM should require encryption',
-            'remediation': 'Set WinRM to require encryption: winrm set winrm/config/service @{AllowUnencrypted="false"}'
-        }
-
-    # ==================== LOGGING CHECKS ====================
-
-    def check_audit_logon(self) -> Dict:
-        """CIS 17.5.1 - Ensure audit policy for logon events is configured"""
-        code, output, _ = self._run_powershell(
-            "auditpol /get /subcategory:'Logon' | Select-String 'Logon'"
-        )
-        passed = 'Success and Failure' in output or 'Success' in output
-        return {
-            'passed': passed,
-            'actual': output if output else 'Unable to determine',
-            'expected': 'Logon events should be audited',
-            'remediation': 'Configure audit policy: auditpol /set /subcategory:"Logon" /success:enable /failure:enable'
-        }
-
-    def check_audit_account_mgmt(self) -> Dict:
-        """CIS 17.2.1 - Ensure audit policy for account management is configured"""
-        code, output, _ = self._run_powershell(
-            "auditpol /get /subcategory:'User Account Management' | Select-String 'User Account Management'"
-        )
-        passed = 'Success and Failure' in output or 'Success' in output
-        return {
-            'passed': passed,
-            'actual': output if output else 'Unable to determine',
-            'expected': 'Account management should be audited',
-            'remediation': 'Configure audit policy for user account management'
-        }
-
-    def check_audit_privilege_use(self) -> Dict:
-        """CIS 17.8.1 - Ensure audit policy for privilege use is configured"""
-        code, output, _ = self._run_powershell(
-            "auditpol /get /subcategory:'Sensitive Privilege Use' | Select-String 'Sensitive Privilege Use'"
-        )
-        passed = 'Success and Failure' in output or 'Success' in output
-        return {
-            'passed': passed,
-            'actual': output if output else 'Unable to determine',
-            'expected': 'Privilege use should be audited',
-            'remediation': 'Configure audit policy for sensitive privilege use'
-        }
-
-    def check_security_log_size(self) -> Dict:
-        """CIS 18.9.27.1.1 - Ensure Security event log size is configured"""
-        code, output, _ = self._run_powershell(
-            "Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\EventLog\\Security' "
-            "-Name 'MaxSize' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty MaxSize"
-        )
-        try:
-            size_kb = int(output) // 1024 if output else 0
-            passed = size_kb >= 196608  # 192 MB
-        except (ValueError, TypeError):
-            size_kb = 'Unable to parse'
-            passed = False
-        return {
-            'passed': passed,
-            'actual': f'Security log max size: {size_kb} KB',
-            'expected': 'Security log should be >= 196608 KB (192 MB)',
-            'remediation': 'Increase Security event log size in Event Viewer properties'
-        }
-
-    def check_event_log_service(self) -> Dict:
-        """Ensure Event Log Service is running"""
-        status = self._check_service_status('EventLog')
-        passed = status['status'] == 'Running' or status['status'] == 4
-        return {
-            'passed': passed,
-            'actual': f'Event Log service status: {status["status"]}',
-            'expected': 'Event Log service should be running',
-            'remediation': 'Start Event Log service: Start-Service EventLog'
-        }
-
-    # ==================== ACCESS CONTROL CHECKS ====================
-
-    def check_uac_enabled(self) -> Dict:
-        """CIS 2.3.17.1 - Ensure UAC is enabled"""
-        code, output, _ = self._run_powershell(
-            "Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System' "
-            "-Name 'EnableLUA' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty EnableLUA"
-        )
-        passed = output == '1'
-        return {
-            'passed': passed,
-            'actual': f'UAC enabled: {output == "1"}',
-            'expected': 'UAC should be enabled',
-            'remediation': 'Enable UAC in Control Panel or via registry'
-        }
-
-    def check_uac_admin_prompt(self) -> Dict:
-        """CIS 2.3.17.2 - Ensure UAC elevation prompts for administrators"""
-        code, output, _ = self._run_powershell(
-            "Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System' "
-            "-Name 'ConsentPromptBehaviorAdmin' -ErrorAction SilentlyContinue | "
-            "Select-Object -ExpandProperty ConsentPromptBehaviorAdmin"
-        )
-        passed = output in ['1', '2', '3', '4', '5']  # Any prompt behavior except 0
-        return {
-            'passed': passed,
-            'actual': f'UAC admin behavior: {output}',
-            'expected': 'UAC should prompt administrators for consent',
-            'remediation': 'Configure UAC to prompt for consent on secure desktop'
-        }
-
-    def check_admin_group(self) -> Dict:
-        """CIS 2.3.1.1 - Ensure local Administrator group membership is restricted"""
-        code, output, _ = self._run_powershell(
-            "Get-LocalGroupMember -Group 'Administrators' | Measure-Object | "
-            "Select-Object -ExpandProperty Count"
-        )
-        try:
-            count = int(output) if output else 0
-            passed = count <= 3  # Reasonable number of admin accounts
-        except (ValueError, TypeError):
-            count = 'Unable to parse'
-            passed = False
-        return {
-            'passed': passed,
-            'actual': f'Admin group members: {count}',
-            'expected': 'Administrator group should have minimal members',
-            'remediation': 'Review and remove unnecessary Administrator group members'
-        }
-
-    def check_anonymous_sid(self) -> Dict:
-        """CIS 2.3.10.2 - Ensure anonymous SID enumeration is disabled"""
-        code, output, _ = self._run_powershell(
-            "Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa' "
-            "-Name 'RestrictAnonymousSAM' -ErrorAction SilentlyContinue | "
-            "Select-Object -ExpandProperty RestrictAnonymousSAM"
-        )
-        passed = output == '1'
-        return {
-            'passed': passed,
-            'actual': f'Anonymous SID restriction: {output}',
-            'expected': 'Anonymous SID enumeration should be disabled',
-            'remediation': 'Enable RestrictAnonymousSAM in Local Security Policy'
-        }
-
-    def check_null_sessions(self) -> Dict:
-        """CIS 2.3.10.5 - Ensure null session shares are restricted"""
-        code, output, _ = self._run_powershell(
-            "Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters' "
-            "-Name 'NullSessionShares' -ErrorAction SilentlyContinue | "
-            "Select-Object -ExpandProperty NullSessionShares"
-        )
-        passed = not output or output == ''
-        return {
-            'passed': passed,
-            'actual': f'Null session shares: {output if output else "None"}',
-            'expected': 'No null session shares should be configured',
-            'remediation': 'Remove null session shares from registry'
-        }
-
-    # ==================== SERVICES CHECKS ====================
-
-    def check_telnet_disabled(self) -> Dict:
-        """CIS 2.2.38 - Ensure Telnet service is disabled"""
-        status = self._check_service_status('TlntSvr')
-        passed = not status['exists'] or status['start_type'] == 'Disabled' or status['start_type'] == 4
-        return {
-            'passed': passed,
-            'actual': f'Telnet service: {status["start_type"]}',
-            'expected': 'Telnet service should be disabled',
-            'remediation': 'Disable Telnet: Set-Service TlntSvr -StartupType Disabled'
-        }
-
-    def check_ftp_disabled(self) -> Dict:
-        """Ensure FTP service is disabled (unless required)"""
-        status = self._check_service_status('FTPSVC')
-        passed = not status['exists'] or status['start_type'] == 'Disabled' or status['start_type'] == 4
-        return {
-            'passed': passed,
-            'actual': f'FTP service: {status["start_type"]}',
-            'expected': 'FTP service should be disabled unless required',
-            'remediation': 'Disable FTP service if not needed'
-        }
-
-    def check_print_spooler(self) -> Dict:
-        """CIS 2.2.32 - Ensure Print Spooler is disabled on domain controllers"""
-        status = self._check_service_status('Spooler')
-        # This is informational - Print Spooler may be needed on some systems
-        return {
-            'passed': True,  # Informational
-            'actual': f'Print Spooler status: {status["status"]}',
-            'expected': 'Print Spooler should be disabled on domain controllers',
-            'remediation': 'Disable Print Spooler on DCs: Stop-Service Spooler; Set-Service Spooler -StartupType Disabled'
-        }
-
-    def check_remote_registry(self) -> Dict:
-        """CIS 2.2.34 - Ensure Remote Registry service is disabled"""
-        status = self._check_service_status('RemoteRegistry')
-        passed = not status['exists'] or status['start_type'] == 'Disabled' or status['start_type'] == 4
-        return {
-            'passed': passed,
-            'actual': f'Remote Registry: {status["start_type"]}',
-            'expected': 'Remote Registry should be disabled',
-            'remediation': 'Disable Remote Registry: Set-Service RemoteRegistry -StartupType Disabled'
-        }
-
-    def check_snmp_disabled(self) -> Dict:
-        """Ensure SNMP service is disabled (unless required)"""
-        status = self._check_service_status('SNMP')
-        passed = not status['exists'] or status['start_type'] == 'Disabled' or status['start_type'] == 4
-        return {
-            'passed': passed,
-            'actual': f'SNMP service: {status["start_type"]}',
-            'expected': 'SNMP should be disabled unless required',
-            'remediation': 'Disable SNMP if not needed'
-        }
-
-    # ==================== RUNNER ====================
-
-    def run_all_checks(self, categories: Optional[List[str]] = None, min_severity: str = 'all') -> Dict:
-        """Run all compliance checks and return results"""
-        severity_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}
-        min_sev_level = severity_order.get(min_severity, 999)
-
-        self.results['scan_time'] = datetime.now().isoformat()
-        self.results['checks'] = []
-
-        categories_to_scan = categories if categories else self.checks.keys()
-
-        for category in categories_to_scan:
-            if category not in self.checks:
+    def system_config_acl(self) -> Outcome:
+        entries = self._ps_json(PS_CONFIG_ACL, "reading the ACL of System32\\config")
+        if not isinstance(entries, list) or not entries:
+            raise Unassessable("the ACL of System32\\config came back empty")
+        broad = []
+        for entry in entries:
+            if entry.get("type") != "Allow" or entry.get("sid") not in BROAD_SIDS:
                 continue
+            if has_write_rights(_as_int(entry.get("rights"), "FileSystemRights")):
+                broad.append(BROAD_SIDS[entry["sid"]])
+        if broad:
+            return failed(f"write access granted to: {', '.join(sorted(set(broad)))}")
+        return passed(f"{len(entries)} ACL entries, none gives write access to Everyone, Users or Authenticated Users")
 
-            for check_id, check_name, severity, check_func in self.checks[category]:
-                # Filter by severity
-                if min_severity != 'all' and severity_order.get(severity, 999) > min_sev_level:
-                    continue
+    # ----------------------------------------------------------- authentication
 
-                try:
-                    result = check_func()
-                    self.results['checks'].append({
-                        'id': check_id,
-                        'category': category,
-                        'name': check_name,
-                        'severity': severity,
-                        'status': 'PASS' if result['passed'] else 'FAIL',
-                        'actual': result.get('actual', ''),
-                        'expected': result.get('expected', ''),
-                        'remediation': result.get('remediation', '')
-                    })
-                except Exception as e:
-                    self.results['checks'].append({
-                        'id': check_id,
-                        'category': category,
-                        'name': check_name,
-                        'severity': severity,
-                        'status': 'ERROR',
-                        'actual': f'Error running check: {str(e)}',
-                        'expected': '',
-                        'remediation': ''
-                    })
+    def password_history(self) -> Outcome:
+        value = self._policy_int("PasswordHistorySize")
+        if value is None:
+            raise Unassessable("the security policy export has no PasswordHistorySize")
+        actual = f"PasswordHistorySize = {value}"
+        return passed(actual) if value >= 24 else failed(actual)
 
-        return self.results
+    def password_max_age(self) -> Outcome:
+        value = self._policy_int("MaximumPasswordAge")
+        if value is None:
+            raise Unassessable("the security policy export has no MaximumPasswordAge")
+        if value <= 0:
+            return failed(f"MaximumPasswordAge = {value} (passwords never expire)")
+        actual = f"MaximumPasswordAge = {value}"
+        return passed(actual) if value <= 365 else failed(actual)
+
+    def password_min_age(self) -> Outcome:
+        value = self._policy_int("MinimumPasswordAge")
+        if value is None:
+            raise Unassessable("the security policy export has no MinimumPasswordAge")
+        actual = f"MinimumPasswordAge = {value}"
+        return passed(actual) if value >= 1 else failed(actual)
+
+    def password_min_length(self) -> Outcome:
+        value = self._policy_int("MinimumPasswordLength")
+        if value is None:
+            raise Unassessable("the security policy export has no MinimumPasswordLength")
+        actual = f"MinimumPasswordLength = {value}"
+        return passed(actual) if value >= 14 else failed(actual)
+
+    def password_complexity(self) -> Outcome:
+        value = self._policy_int("PasswordComplexity")
+        if value is None:
+            raise Unassessable("the security policy export has no PasswordComplexity")
+        actual = f"PasswordComplexity = {value}"
+        return passed(actual) if value == 1 else failed(actual)
+
+    def lockout_threshold(self) -> Outcome:
+        value = self._policy_int("LockoutBadCount")
+        if value is None:
+            raise Unassessable("the security policy export has no LockoutBadCount")
+        if value == 0:
+            return failed("LockoutBadCount = 0 (accounts never lock)")
+        actual = f"LockoutBadCount = {value}"
+        return passed(actual) if 1 <= value <= 5 else failed(actual)
+
+    def lockout_duration(self) -> Outcome:
+        threshold = self._policy_int("LockoutBadCount")
+        if threshold is None:
+            raise Unassessable("the security policy export has no LockoutBadCount")
+        if threshold == 0:
+            return failed("no lockout threshold is set, so a lockout duration never applies")
+        value = self._policy_int("LockoutDuration")
+        if value is None:
+            raise Unassessable("the security policy export has no LockoutDuration")
+        if value == -1:
+            return passed("LockoutDuration = -1 (locked until an administrator clears it)")
+        actual = f"LockoutDuration = {value} minutes"
+        return passed(actual) if value >= 15 else failed(actual)
+
+    def guest_account_disabled(self) -> Outcome:
+        value = self._policy_int("EnableGuestAccount")
+        if value is None:
+            raise Unassessable("the security policy export has no EnableGuestAccount")
+        actual = f"EnableGuestAccount = {value}"
+        return passed(actual) if value == 0 else failed(actual)
+
+    def administrator_renamed(self) -> Outcome:
+        raw = self._security_policy().get("NewAdministratorName")
+        if raw is None:
+            raise Unassessable("the security policy export has no NewAdministratorName")
+        name = raw.strip().strip('"')
+        if name.lower() == "administrator":
+            return failed("the built-in administrator account is still named Administrator")
+        return passed("the built-in administrator account has been renamed")
+
+    def rdp_nla_required(self) -> Outcome:
+        policy = self._registry(r"HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services", "UserAuthentication")
+        if policy is not None:
+            value, source = _as_int(policy, "UserAuthentication"), "policy"
+        else:
+            listener = self._registry(
+                r"HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp", "UserAuthentication")
+            if listener is None:
+                return failed("UserAuthentication is not set for the RDP-Tcp listener or in policy")
+            value, source = _as_int(listener, "UserAuthentication"), "RDP-Tcp listener"
+        actual = f"UserAuthentication = {value} ({source})"
+        return passed(actual) if value == 1 else failed(actual)
+
+    # ------------------------------------------------------------------ network
+
+    def firewall_profiles_enabled(self) -> Outcome:
+        profiles = self._ps_json(PS_FIREWALL, "the firewall profile query")
+        if not isinstance(profiles, list) or not profiles:
+            raise Unassessable("the firewall profile query returned no profiles")
+        off = [str(p.get("name")) for p in profiles if str(p.get("enabled")).lower() not in ("true", "1")]
+        if off:
+            return failed(f"firewall profiles not enabled: {', '.join(off)}")
+        return passed(f"enabled profiles: {', '.join(str(p.get('name')) for p in profiles)}")
+
+    def smbv1_disabled(self) -> Outcome:
+        enabled = self._ps_json(PS_SMB1, "the SMB server configuration query")
+        if not isinstance(enabled, bool):
+            raise Unassessable("the SMB server configuration query returned an unexpected value")
+        return failed("EnableSMB1Protocol = True") if enabled else passed("EnableSMB1Protocol = False")
+
+    def netbios_disabled(self) -> Outcome:
+        adapters = self._ps_json(PS_NETBIOS, "the network adapter query")
+        if not isinstance(adapters, list):
+            raise Unassessable("the network adapter query returned an unexpected shape")
+        if not adapters:
+            raise NotApplicable("no IP-enabled network adapter is present")
+        on = [str(a.get("adapter")) for a in adapters if _as_int(a.get("option"), "TcpipNetbiosOptions") != 2]
+        if on:
+            return failed(f"NetBIOS over TCP/IP is not disabled on: {', '.join(on)}")
+        return passed(f"NetBIOS over TCP/IP is disabled on all {len(adapters)} IP-enabled adapters")
+
+    def llmnr_disabled(self) -> Outcome:
+        value = self._registry(r"HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\DNSClient", "EnableMulticast")
+        if value is None:
+            return failed("the EnableMulticast policy value is not set, so LLMNR is on by default")
+        number = _as_int(value, "EnableMulticast")
+        actual = f"EnableMulticast = {number}"
+        return passed(actual) if number == 0 else failed(actual)
+
+    def winrm_requires_encryption(self) -> Outcome:
+        service = self._service("WinRM")
+        if not service["exists"] or service.get("start_type") == "Disabled":
+            raise NotApplicable("the WinRM service is not installed or is disabled")
+        policy = self._registry(r"HKLM:\SOFTWARE\Policies\Microsoft\Windows\WinRM\Service", "AllowUnencryptedTraffic")
+        if policy is not None:
+            number = _as_int(policy, "AllowUnencryptedTraffic")
+            actual = f"AllowUnencryptedTraffic = {number} (policy)"
+            return passed(actual) if number == 0 else failed(actual)
+        if service.get("status") != "Running":
+            raise Unassessable("WinRM is stopped and no policy value is set, so the live setting cannot be read")
+        value = str(self._ps_json(PS_WINRM_ALLOW_UNENCRYPTED, "reading the WinRM service configuration")).lower()
+        if value == "false":
+            return passed("AllowUnencrypted = false")
+        if value == "true":
+            return failed("AllowUnencrypted = true")
+        raise Unassessable(f"the WinRM setting came back as {value!r}")
+
+    # ------------------------------------------------------------------ logging
+
+    def audit_logon(self) -> Outcome:
+        return self._audit_setting(AUDIT_LOGON, "Audit Logon")
+
+    def audit_user_account_management(self) -> Outcome:
+        return self._audit_setting(AUDIT_USER_ACCOUNT_MANAGEMENT, "Audit User Account Management")
+
+    def audit_sensitive_privilege_use(self) -> Outcome:
+        return self._audit_setting(AUDIT_SENSITIVE_PRIVILEGE_USE, "Audit Sensitive Privilege Use")
+
+    def security_log_size(self) -> Outcome:
+        size_kb = _as_int(self._ps_json(PS_SECURITY_LOG_SIZE, "the Security log query"), "MaximumSizeInBytes") // 1024
+        actual = f"Security log maximum size: {size_kb} KB"
+        return passed(actual) if size_kb >= 196608 else failed(actual)
+
+    def event_log_service_running(self) -> Outcome:
+        service = self._service("EventLog")
+        if not service["exists"]:
+            return failed("the EventLog service is not installed")
+        actual = f"EventLog service status: {service.get('status')}"
+        return passed(actual) if service.get("status") == "Running" else failed(actual)
+
+    # ----------------------------------------------------------- access control
+
+    def uac_enabled(self) -> Outcome:
+        value = self._registry(r"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System", "EnableLUA")
+        if value is None:
+            return failed("EnableLUA is not set")
+        number = _as_int(value, "EnableLUA")
+        actual = f"EnableLUA = {number}"
+        return passed(actual) if number == 1 else failed(actual)
+
+    def uac_admin_prompt(self) -> Outcome:
+        value = self._registry(
+            r"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System", "ConsentPromptBehaviorAdmin")
+        if value is None:
+            return failed("ConsentPromptBehaviorAdmin is not set")
+        number = _as_int(value, "ConsentPromptBehaviorAdmin")
+        actual = f"ConsentPromptBehaviorAdmin = {number}"
+        return passed(actual) if number in (1, 2) else failed(actual)
+
+    def administrators_group_review(self) -> Outcome:
+        members = self._ps_json(PS_ADMINISTRATORS, "the Administrators group query")
+        if not isinstance(members, list):
+            raise Unassessable("the Administrators group query returned an unexpected shape")
+        names = [str(m.get("name")) for m in members]
+        return manual(f"{len(names)} members of the local Administrators group to review: {', '.join(names) or 'none'}")
+
+    def anonymous_sam_enumeration_restricted(self) -> Outcome:
+        value = self._registry(r"HKLM:\SYSTEM\CurrentControlSet\Control\Lsa", "RestrictAnonymousSAM")
+        if value is None:
+            return failed("RestrictAnonymousSAM is not set")
+        number = _as_int(value, "RestrictAnonymousSAM")
+        actual = f"RestrictAnonymousSAM = {number}"
+        return passed(actual) if number == 1 else failed(actual)
+
+    def null_session_shares_restricted(self) -> Outcome:
+        value = self._registry(r"HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters", "NullSessionShares")
+        if value is None:
+            return passed("NullSessionShares is not set")
+        shares: List[str] = [str(v) for v in (value if isinstance(value, list) else [value]) if str(v).strip()]
+        if shares:
+            return failed(f"shares open to anonymous access: {', '.join(shares)}")
+        return passed("NullSessionShares is empty")
+
+    # ----------------------------------------------------------------- services
+
+    def telnet_service_disabled(self) -> Outcome:
+        return self._service_disabled("TlntSvr", "Telnet")
+
+    def ftp_service_disabled(self) -> Outcome:
+        return self._service_disabled("FTPSVC", "Microsoft FTP")
+
+    def print_spooler_on_domain_controller(self) -> Outcome:
+        role = _as_int(self._ps_json(PS_DOMAIN_ROLE, "the domain role query"), "DomainRole")
+        if role not in (4, 5):
+            raise NotApplicable("this host is not a domain controller")
+        return self._service_disabled("Spooler", "Print Spooler")
+
+    def remote_registry_disabled(self) -> Outcome:
+        return self._service_disabled("RemoteRegistry", "Remote Registry")
+
+    def snmp_service_disabled(self) -> Outcome:
+        return self._service_disabled("SNMP", "SNMP")

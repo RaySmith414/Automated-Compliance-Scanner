@@ -1,0 +1,449 @@
+# Windows check catalog. Single source for check IDs, titles, severities,
+# expected state, remediation text and framework mappings.
+# The code in scanner/windows_checks.py supplies only the test logic for each
+# "function" named here. tests/test_catalog.py fails if the two drift apart.
+
+platform: windows
+
+benchmark:
+  family: CIS Benchmarks for Microsoft Windows Server
+  written_against: Windows Server 2019 and 2022, member server profile
+  note: >-
+    Checks marked "cis: false" are hygiene checks that are not CIS
+    recommendations. For the rest the CIS recommendation is cited by title.
+    Recommendation numbers change between benchmark versions, so cis_id is empty
+    by default. Fill it in as a quoted string (for example "1.1.1") from the
+    benchmark version your organization has adopted and it will appear in every
+    report.
+
+checks:
+  # ------------------------------------------------------------- filesystem
+  - id: WIN-FS-001
+    function: fixed_volumes_use_ntfs
+    title: Ensure fixed volumes use NTFS or ReFS
+    category: filesystem
+    severity: high
+    requires_root: false
+    expected: Every fixed volume with a drive letter is formatted NTFS or ReFS
+    remediation: 'Convert the volume with "convert <drive>: /fs:ntfs" or reformat it.'
+    cis: false
+    cis_id: null
+    nist_800_53: [AC-3, CM-6]
+    soc2: [CC6.1]
+    iso_27001: [A.8.3]
+
+  - id: WIN-FS-002
+    function: system_config_acl
+    title: Ensure the registry hive folder grants no write access to broad groups
+    category: filesystem
+    severity: high
+    requires_root: true
+    expected: Everyone, Users and Authenticated Users hold no write, modify or full control entry on %SystemRoot%\System32\config
+    remediation: Remove the broad write entry with icacls and restore the default ACL for the folder.
+    cis: false
+    cis_id: null
+    nist_800_53: [AC-3, AC-6]
+    soc2: [CC6.1, CC6.3]
+    iso_27001: [A.8.3]
+
+  # --------------------------------------------------------- authentication
+  - id: WIN-AUTH-001
+    function: password_history
+    title: Ensure 'Enforce password history' is set to 24 or more passwords
+    category: authentication
+    severity: high
+    requires_root: true
+    expected: PasswordHistorySize is 24 or more
+    remediation: 'Set "Enforce password history" to 24 under Account Policies, Password Policy.'
+    cis_id: null
+    nist_800_53: [IA-5]
+    soc2: [CC6.1]
+    iso_27001: [A.5.17]
+
+  - id: WIN-AUTH-002
+    function: password_max_age
+    title: Ensure 'Maximum password age' is set to 365 or fewer days, but not 0
+    category: authentication
+    severity: high
+    requires_root: true
+    expected: MaximumPasswordAge is between 1 and 365 days
+    remediation: 'Set "Maximum password age" to 365 or fewer days under Account Policies, Password Policy.'
+    cis_id: null
+    nist_800_53: [IA-5]
+    soc2: [CC6.1]
+    iso_27001: [A.5.17]
+
+  - id: WIN-AUTH-003
+    function: password_min_age
+    title: Ensure 'Minimum password age' is set to 1 or more days
+    category: authentication
+    severity: medium
+    requires_root: true
+    expected: MinimumPasswordAge is 1 or more days
+    remediation: 'Set "Minimum password age" to 1 or more days under Account Policies, Password Policy.'
+    cis_id: null
+    nist_800_53: [IA-5]
+    soc2: [CC6.1]
+    iso_27001: [A.5.17]
+
+  - id: WIN-AUTH-004
+    function: password_min_length
+    title: Ensure 'Minimum password length' is set to 14 or more characters
+    category: authentication
+    severity: high
+    requires_root: true
+    expected: MinimumPasswordLength is 14 or more
+    remediation: 'Set "Minimum password length" to 14 under Account Policies, Password Policy.'
+    cis_id: null
+    nist_800_53: [IA-5]
+    soc2: [CC6.1]
+    iso_27001: [A.5.17]
+
+  - id: WIN-AUTH-005
+    function: password_complexity
+    title: Ensure 'Password must meet complexity requirements' is set to Enabled
+    category: authentication
+    severity: high
+    requires_root: true
+    expected: PasswordComplexity is 1
+    remediation: 'Enable "Password must meet complexity requirements" under Account Policies, Password Policy.'
+    cis_id: null
+    nist_800_53: [IA-5]
+    soc2: [CC6.1]
+    iso_27001: [A.5.17]
+
+  - id: WIN-AUTH-006
+    function: lockout_threshold
+    title: Ensure 'Account lockout threshold' is set to 5 or fewer invalid logon attempts, but not 0
+    category: authentication
+    severity: high
+    requires_root: true
+    expected: LockoutBadCount is between 1 and 5
+    remediation: 'Set "Account lockout threshold" to 5 or fewer under Account Policies, Account Lockout Policy.'
+    cis_id: null
+    nist_800_53: [AC-7]
+    soc2: [CC6.1]
+    iso_27001: [A.8.5]
+
+  - id: WIN-AUTH-007
+    function: lockout_duration
+    title: Ensure 'Account lockout duration' is set to 15 or more minutes
+    category: authentication
+    severity: medium
+    requires_root: true
+    expected: LockoutDuration is 15 or more minutes. A lockout that lasts until an administrator clears it also passes
+    remediation: 'Set "Account lockout duration" to 15 or more minutes under Account Policies, Account Lockout Policy.'
+    cis_id: null
+    nist_800_53: [AC-7]
+    soc2: [CC6.1]
+    iso_27001: [A.8.5]
+
+  - id: WIN-AUTH-008
+    function: guest_account_disabled
+    title: Ensure 'Accounts - Guest account status' is set to Disabled
+    category: authentication
+    severity: critical
+    requires_root: true
+    expected: EnableGuestAccount is 0
+    remediation: 'Disable the Guest account with "net user Guest /active:no" or the matching security option.'
+    cis_id: null
+    nist_800_53: [AC-2]
+    soc2: [CC6.2]
+    iso_27001: [A.5.18]
+
+  - id: WIN-AUTH-009
+    function: administrator_renamed
+    title: Configure 'Accounts - Rename administrator account'
+    category: authentication
+    severity: medium
+    requires_root: true
+    expected: The built-in administrator account is not named "Administrator"
+    remediation: 'Rename the built-in account with the "Accounts: Rename administrator account" security option.'
+    cis_id: null
+    nist_800_53: [AC-2, CM-6]
+    soc2: [CC6.1]
+    iso_27001: [A.8.2]
+
+  - id: WIN-AUTH-010
+    function: rdp_nla_required
+    title: Ensure Remote Desktop requires Network Level Authentication
+    category: authentication
+    severity: high
+    requires_root: false
+    expected: UserAuthentication is 1 for the RDP-Tcp listener or in policy
+    remediation: 'Enable "Require user authentication for remote connections by using Network Level Authentication" in Remote Desktop Session Host security policy.'
+    cis_id: null
+    nist_800_53: [AC-17, IA-2]
+    soc2: [CC6.1, CC6.6]
+    iso_27001: [A.8.5]
+
+  # ---------------------------------------------------------------- network
+  - id: WIN-NET-001
+    function: firewall_profiles_enabled
+    title: Ensure Windows Firewall is on for the Domain, Private and Public profiles
+    category: network
+    severity: critical
+    requires_root: false
+    expected: All three firewall profiles are enabled
+    remediation: Run "Set-NetFirewallProfile -Profile Domain,Private,Public -Enabled True".
+    cis_id: null
+    nist_800_53: [SC-7, AC-4]
+    soc2: [CC6.6]
+    iso_27001: [A.8.20, A.8.22]
+
+  - id: WIN-NET-002
+    function: smbv1_disabled
+    title: Ensure the SMB v1 server is disabled
+    category: network
+    severity: critical
+    requires_root: true
+    expected: EnableSMB1Protocol is False in the SMB server configuration
+    remediation: Run "Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force".
+    cis_id: null
+    nist_800_53: [CM-7, CM-6]
+    soc2: [CC7.1]
+    iso_27001: [A.8.21, A.8.9]
+
+  - id: WIN-NET-003
+    function: netbios_disabled
+    title: Ensure NetBIOS over TCP/IP is disabled on every IP-enabled adapter
+    category: network
+    severity: medium
+    requires_root: false
+    expected: TcpipNetbiosOptions is 2 on every IP-enabled adapter
+    remediation: Disable NetBIOS over TCP/IP in the adapter WINS settings or through DHCP option 001.
+    cis: false
+    cis_id: null
+    nist_800_53: [CM-7]
+    soc2: [CC7.1]
+    iso_27001: [A.8.21]
+
+  - id: WIN-NET-004
+    function: llmnr_disabled
+    title: Ensure 'Turn off multicast name resolution' is set to Enabled
+    category: network
+    severity: medium
+    requires_root: false
+    expected: The policy value EnableMulticast is 0
+    remediation: 'Enable "Turn off multicast name resolution" under Network, DNS Client in Group Policy.'
+    cis_id: null
+    nist_800_53: [CM-7]
+    soc2: [CC7.1]
+    iso_27001: [A.8.21]
+
+  - id: WIN-NET-005
+    function: winrm_requires_encryption
+    title: Ensure the WinRM service does not allow unencrypted traffic
+    category: network
+    severity: high
+    requires_root: true
+    expected: AllowUnencrypted is false for the WinRM service
+    remediation: 'Set "Allow unencrypted traffic" to Disabled under Windows Remote Management, WinRM Service in Group Policy.'
+    cis_id: null
+    nist_800_53: [SC-8, AC-17]
+    soc2: [CC6.7]
+    iso_27001: [A.8.21, A.8.24]
+
+  # ---------------------------------------------------------------- logging
+  - id: WIN-LOG-001
+    function: audit_logon
+    title: Ensure 'Audit Logon' is set to Success and Failure
+    category: logging
+    severity: high
+    requires_root: true
+    expected: The Logon subcategory audits Success and Failure
+    remediation: Run auditpol /set /subcategory:"Logon" /success:enable /failure:enable or set it in Advanced Audit Policy.
+    cis_id: null
+    nist_800_53: [AU-2, AU-12]
+    soc2: [CC7.2]
+    iso_27001: [A.8.15]
+
+  - id: WIN-LOG-002
+    function: audit_user_account_management
+    title: Ensure 'Audit User Account Management' is set to Success and Failure
+    category: logging
+    severity: high
+    requires_root: true
+    expected: The User Account Management subcategory audits Success and Failure
+    remediation: Run auditpol /set /subcategory:"User Account Management" /success:enable /failure:enable or set it in Advanced Audit Policy.
+    cis_id: null
+    nist_800_53: [AU-2, AU-12, AC-2]
+    soc2: [CC7.2]
+    iso_27001: [A.8.15]
+
+  - id: WIN-LOG-003
+    function: audit_sensitive_privilege_use
+    title: Ensure 'Audit Sensitive Privilege Use' is set to Success and Failure
+    category: logging
+    severity: medium
+    requires_root: true
+    expected: The Sensitive Privilege Use subcategory audits Success and Failure
+    remediation: Run auditpol /set /subcategory:"Sensitive Privilege Use" /success:enable /failure:enable or set it in Advanced Audit Policy.
+    cis_id: null
+    nist_800_53: [AU-2, AU-12, AC-6]
+    soc2: [CC7.2]
+    iso_27001: [A.8.15]
+
+  - id: WIN-LOG-004
+    function: security_log_size
+    title: Ensure the Security event log maximum size is 196,608 KB or greater
+    category: logging
+    severity: medium
+    requires_root: true
+    expected: The Security log maximum size is at least 196,608 KB
+    remediation: 'Set "Specify the maximum log file size (KB)" to 196608 or more for the Security log in Group Policy.'
+    cis_id: null
+    nist_800_53: [AU-4]
+    soc2: [CC7.2]
+    iso_27001: [A.8.15]
+
+  - id: WIN-LOG-005
+    function: event_log_service_running
+    title: Ensure the Windows Event Log service is running
+    category: logging
+    severity: high
+    requires_root: false
+    expected: The EventLog service status is Running
+    remediation: Run "Start-Service EventLog" and set the service to start automatically.
+    cis: false
+    cis_id: null
+    nist_800_53: [AU-12]
+    soc2: [CC7.2]
+    iso_27001: [A.8.15]
+
+  # --------------------------------------------------------- access control
+  - id: WIN-ACC-001
+    function: uac_enabled
+    title: Ensure UAC runs all administrators in Admin Approval Mode
+    category: access_control
+    severity: critical
+    requires_root: false
+    expected: EnableLUA is 1
+    remediation: 'Enable "User Account Control: Run all administrators in Admin Approval Mode" and restart.'
+    cis_id: null
+    nist_800_53: [AC-6]
+    soc2: [CC6.3]
+    iso_27001: [A.8.2]
+
+  - id: WIN-ACC-002
+    function: uac_admin_prompt
+    title: Ensure UAC prompts administrators for consent or credentials on the secure desktop
+    category: access_control
+    severity: high
+    requires_root: false
+    expected: ConsentPromptBehaviorAdmin is 1 or 2
+    remediation: 'Set the UAC administrator prompt behavior to "Prompt for consent on the secure desktop" in Security Options.'
+    cis_id: null
+    nist_800_53: [AC-6]
+    soc2: [CC6.3]
+    iso_27001: [A.8.2]
+
+  - id: WIN-ACC-003
+    function: administrators_group_review
+    title: Review membership of the local Administrators group
+    category: access_control
+    severity: high
+    requires_root: false
+    expected: Every member of the local Administrators group is known and justified
+    remediation: Remove accounts that do not need administrator rights with "Remove-LocalGroupMember".
+    cis: false
+    cis_id: null
+    nist_800_53: [AC-6, AC-2]
+    soc2: [CC6.3]
+    iso_27001: [A.8.2]
+
+  - id: WIN-ACC-004
+    function: anonymous_sam_enumeration_restricted
+    title: Ensure anonymous enumeration of SAM accounts is not allowed
+    category: access_control
+    severity: medium
+    requires_root: false
+    expected: RestrictAnonymousSAM is 1
+    remediation: 'Enable "Network access: Do not allow anonymous enumeration of SAM accounts" in Security Options.'
+    cis_id: null
+    nist_800_53: [AC-14, AC-3]
+    soc2: [CC6.1]
+    iso_27001: [A.5.15]
+
+  - id: WIN-ACC-005
+    function: null_session_shares_restricted
+    title: Ensure no shares can be accessed anonymously
+    category: access_control
+    severity: high
+    requires_root: false
+    expected: NullSessionShares is empty or absent
+    remediation: 'Clear "Network access: Shares that can be accessed anonymously" in Security Options.'
+    cis_id: null
+    nist_800_53: [AC-14, AC-3]
+    soc2: [CC6.1]
+    iso_27001: [A.5.15, A.8.3]
+
+  # --------------------------------------------------------------- services
+  - id: WIN-SVC-001
+    function: telnet_service_disabled
+    title: Ensure the Telnet server service is absent or disabled
+    category: services
+    severity: critical
+    requires_root: false
+    expected: The TlntSvr service is not installed or its start type is Disabled
+    remediation: Run "Set-Service TlntSvr -StartupType Disabled" or remove the Telnet Server feature.
+    cis: false
+    cis_id: null
+    nist_800_53: [CM-7, SC-8]
+    soc2: [CC6.7, CC7.1]
+    iso_27001: [A.8.21, A.8.9]
+
+  - id: WIN-SVC-002
+    function: ftp_service_disabled
+    title: Ensure the Microsoft FTP service is absent or disabled
+    category: services
+    severity: high
+    requires_root: false
+    expected: The FTPSVC service is not installed or its start type is Disabled
+    remediation: Run "Set-Service FTPSVC -StartupType Disabled" or remove the FTP Server role service.
+    cis: false
+    cis_id: null
+    nist_800_53: [CM-7, SC-8]
+    soc2: [CC6.7, CC7.1]
+    iso_27001: [A.8.21, A.8.9]
+
+  - id: WIN-SVC-003
+    function: print_spooler_on_domain_controller
+    title: Ensure Print Spooler is disabled on domain controllers
+    category: services
+    severity: high
+    requires_root: false
+    expected: On a domain controller the Spooler service start type is Disabled
+    remediation: Run "Stop-Service Spooler" and "Set-Service Spooler -StartupType Disabled" on every domain controller.
+    cis_id: null
+    nist_800_53: [CM-7]
+    soc2: [CC7.1]
+    iso_27001: [A.8.9]
+
+  - id: WIN-SVC-004
+    function: remote_registry_disabled
+    title: Ensure the Remote Registry service is disabled
+    category: services
+    severity: medium
+    requires_root: false
+    expected: The RemoteRegistry service is not installed or its start type is Disabled
+    remediation: Run "Set-Service RemoteRegistry -StartupType Disabled".
+    cis: false
+    cis_id: null
+    nist_800_53: [CM-7, AC-17]
+    soc2: [CC7.1]
+    iso_27001: [A.8.9]
+
+  - id: WIN-SVC-005
+    function: snmp_service_disabled
+    title: Ensure the SNMP service is absent or disabled unless required
+    category: services
+    severity: medium
+    requires_root: false
+    expected: The SNMP service is not installed or its start type is Disabled
+    remediation: Run "Set-Service SNMP -StartupType Disabled" or remove the SNMP feature if nothing depends on it.
+    cis: false
+    cis_id: null
+    nist_800_53: [CM-7]
+    soc2: [CC7.1]
+    iso_27001: [A.8.9]

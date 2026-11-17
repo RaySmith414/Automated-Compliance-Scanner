@@ -1,714 +1,630 @@
-"""
-Linux CIS Benchmark Compliance Checks
-Based on CIS Benchmark for Ubuntu Linux 22.04 LTS
+"""Linux check logic.
 
-Author: Rayshaun Smith
-GitHub: https://github.com/RaySmith414
+Titles, severities, remediation text and framework mappings live in
+scanner/data/checks_linux.yaml. This module holds only the test for each check.
+
+Rules every check follows:
+  * Read the real state through the probe. Never substitute a default for a
+    value that could not be read.
+  * Return passed() or failed() only when the state was read.
+  * Raise Unassessable when it could not be read (tool missing, timeout,
+    permission). The runner reports that as ERROR.
+  * Raise NotApplicable when the control does not apply to this host.
+  * Return manual() when evidence was collected but a person has to judge it.
 """
 
-import os
-import subprocess
 import re
-import stat
-from pathlib import Path
 from typing import Dict, List, Optional
-from datetime import datetime
+
+from scanner.model import NotApplicable, Outcome, Unassessable, failed, manual, passed
+
+DEFAULT_FIND_TIMEOUT = 120
+SAMPLE_LIMIT = 5
+
+_TRUE_WORDS = {"yes", "true", "1", "on"}
+
+# Mounts that hold no files of their own. `df` hides these as well.
+PSEUDO_FILESYSTEMS = {
+    "proc", "sysfs", "devtmpfs", "devpts", "cgroup", "cgroup2", "securityfs", "pstore", "bpf", "tracefs", "debugfs",
+    "mqueue", "hugetlbfs", "fusectl", "configfs", "autofs", "binfmt_misc", "nsfs", "rpc_pipefs", "efivarfs",
+    "selinuxfs", "fuse",
+}
+# Remote file systems are out of scope for a host scan, as with `df --local`.
+NETWORK_FILESYSTEMS = {
+    "nfs", "nfs4", "cifs", "smb3", "smbfs", "9p", "ceph", "glusterfs", "lustre", "afs", "ncpfs", "davfs", "beegfs",
+}
 
 
-class LinuxComplianceChecker:
-    """Performs CIS Benchmark compliance checks on Linux systems"""
+# --------------------------------------------------------------------------
+# Pure helpers (unit tested directly)
+# --------------------------------------------------------------------------
 
-    def __init__(self):
-        self.results = {
-            'system_info': self._get_system_info(),
-            'scan_time': None,
-            'checks': []
+def mode_within(mode: int, limit: int) -> bool:
+    """True when `mode` grants no permission bit beyond `limit`.
+
+    This is a bitwise test. Comparing the two numbers would accept 0604 as
+    "more restrictive" than 0640 although it lets everyone read the file.
+    """
+    return (mode & ~limit & 0o7777) == 0
+
+
+def parse_login_defs(text: str) -> Dict[str, str]:
+    values: Dict[str, str] = {}
+    for line in text.splitlines():
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        parts = line.split(None, 1)
+        if len(parts) == 2:
+            values[parts[0]] = parts[1].strip()
+    return values
+
+
+def parse_assignments(text: str) -> Dict[str, str]:
+    """Parse KEY=VALUE lines (shell style or systemd unit style)."""
+    values: Dict[str, str] = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith(("#", ";", "[")) or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip().strip("\"'")
+    return values
+
+
+def parse_sshd_config(text: str) -> Dict[str, str]:
+    """Parse `sshd -T` output: one lowercase keyword and its value per line."""
+    values: Dict[str, str] = {}
+    for line in text.splitlines():
+        parts = line.strip().split(None, 1)
+        if not parts:
+            continue
+        key = parts[0].lower()
+        if key not in values:
+            values[key] = parts[1].strip() if len(parts) == 2 else ""
+    return values
+
+
+def _unescape_mount(path: str) -> str:
+    return re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), path)
+
+
+def parse_mountinfo(text: str) -> Dict[str, Dict[str, object]]:
+    """Map mount point to its mount options and file system type.
+
+    Later lines win, which matches what is visible when mounts are stacked.
+    """
+    mounts: Dict[str, Dict[str, object]] = {}
+    for line in text.splitlines():
+        parts = line.split()
+        if "-" not in parts:
+            continue
+        sep = parts.index("-")
+        if sep < 6 or sep + 1 >= len(parts):
+            continue
+        mounts[_unescape_mount(parts[4])] = {
+            "options": set(parts[5].split(",")),
+            "fstype": parts[sep + 1],
         }
+    return mounts
 
-        # Define all checks with metadata
-        self.checks = {
-            'filesystem': [
-                ('FS-001', 'Ensure mounting of cramfs is disabled', 'high', self.check_cramfs_disabled),
-                ('FS-002', 'Ensure mounting of squashfs is disabled', 'medium', self.check_squashfs_disabled),
-                ('FS-003', 'Ensure mounting of udf is disabled', 'low', self.check_udf_disabled),
-                ('FS-004', 'Ensure /tmp is a separate partition', 'high', self.check_tmp_partition),
-                ('FS-005', 'Ensure noexec option set on /tmp', 'high', self.check_tmp_noexec),
-                ('FS-006', 'Ensure nodev option set on /tmp', 'medium', self.check_tmp_nodev),
-                ('FS-007', 'Ensure nosuid option set on /tmp', 'medium', self.check_tmp_nosuid),
-            ],
-            'authentication': [
-                ('AUTH-001', 'Ensure password expiration is 365 days or less', 'high', self.check_password_max_days),
-                ('AUTH-002', 'Ensure minimum days between password changes', 'medium', self.check_password_min_days),
-                ('AUTH-003', 'Ensure password expiration warning is 7 days', 'low', self.check_password_warn_age),
-                ('AUTH-004', 'Ensure inactive password lock is 30 days or less', 'medium', self.check_inactive_lock),
-                ('AUTH-005', 'Ensure root is the only UID 0 account', 'critical', self.check_root_only_uid0),
-                ('AUTH-006', 'Ensure root login is restricted to console', 'high', self.check_root_console_only),
-                ('AUTH-007', 'Ensure SSH root login is disabled', 'critical', self.check_ssh_root_login),
-                ('AUTH-008', 'Ensure SSH PermitEmptyPasswords is disabled', 'critical', self.check_ssh_empty_passwords),
-                ('AUTH-009', 'Ensure SSH PasswordAuthentication is configured', 'medium', self.check_ssh_password_auth),
-                ('AUTH-010', 'Ensure SSH MaxAuthTries is 4 or less', 'medium', self.check_ssh_max_auth_tries),
-            ],
-            'network': [
-                ('NET-001', 'Ensure IP forwarding is disabled', 'high', self.check_ip_forwarding),
-                ('NET-002', 'Ensure packet redirect sending is disabled', 'medium', self.check_send_redirects),
-                ('NET-003', 'Ensure source routed packets are not accepted', 'medium', self.check_source_route),
-                ('NET-004', 'Ensure ICMP redirects are not accepted', 'medium', self.check_icmp_redirects),
-                ('NET-005', 'Ensure broadcast ICMP requests are ignored', 'medium', self.check_icmp_broadcast),
-                ('NET-006', 'Ensure TCP SYN Cookies are enabled', 'high', self.check_syn_cookies),
-                ('NET-007', 'Ensure firewall is active', 'critical', self.check_firewall_active),
-            ],
-            'logging': [
-                ('LOG-001', 'Ensure rsyslog is installed', 'high', self.check_rsyslog_installed),
-                ('LOG-002', 'Ensure rsyslog service is enabled', 'high', self.check_rsyslog_enabled),
-                ('LOG-003', 'Ensure journald is configured to compress logs', 'low', self.check_journald_compress),
-                ('LOG-004', 'Ensure journald is configured to write to persistent storage', 'medium', self.check_journald_persistent),
-                ('LOG-005', 'Ensure permissions on /var/log are configured', 'medium', self.check_var_log_permissions),
-            ],
-            'access_control': [
-                ('AC-001', 'Ensure permissions on /etc/passwd are configured', 'high', self.check_passwd_permissions),
-                ('AC-002', 'Ensure permissions on /etc/shadow are configured', 'critical', self.check_shadow_permissions),
-                ('AC-003', 'Ensure permissions on /etc/group are configured', 'high', self.check_group_permissions),
-                ('AC-004', 'Ensure no world-writable files exist', 'high', self.check_world_writable),
-                ('AC-005', 'Ensure no unowned files exist', 'medium', self.check_unowned_files),
-                ('AC-006', 'Ensure SUID/SGID files are reviewed', 'high', self.check_suid_sgid_files),
-            ],
-            'services': [
-                ('SVC-001', 'Ensure xinetd is not installed', 'medium', self.check_xinetd_not_installed),
-                ('SVC-002', 'Ensure telnet server is not installed', 'critical', self.check_telnet_not_installed),
-                ('SVC-003', 'Ensure FTP server is not installed', 'high', self.check_ftp_not_installed),
-                ('SVC-004', 'Ensure HTTP server is not installed (unless required)', 'medium', self.check_http_not_installed),
-                ('SVC-005', 'Ensure LDAP server is not installed (unless required)', 'medium', self.check_ldap_not_installed),
-                ('SVC-006', 'Ensure NFS is not installed (unless required)', 'medium', self.check_nfs_not_installed),
-            ]
-        }
 
-    def _get_system_info(self) -> Dict:
-        """Gather system information"""
+def parse_filesystems(text: str) -> List[str]:
+    """File system types the running kernel can mount right now."""
+    return [line.split()[-1] for line in text.splitlines() if line.strip()]
+
+
+def parse_passwd_uid0(text: str) -> List[str]:
+    names = []
+    for line in text.splitlines():
+        fields = line.split(":")
+        if len(fields) >= 3 and fields[2].strip() == "0":
+            names.append(fields[0])
+    return names
+
+
+def _sample(items: List[str]) -> str:
+    shown = ", ".join(items[:SAMPLE_LIMIT])
+    more = len(items) - SAMPLE_LIMIT
+    return shown + (f" (and {more} more)" if more > 0 else "")
+
+
+# --------------------------------------------------------------------------
+# Checks
+# --------------------------------------------------------------------------
+
+class LinuxChecks:
+    """One method per `function` in checks_linux.yaml."""
+
+    platform = "linux"
+
+    def __init__(self, probe, find_timeout: int = DEFAULT_FIND_TIMEOUT):
+        self.probe = probe
+        self.find_timeout = find_timeout
+        self._sshd: Optional[Dict[str, str]] = None
+        self._package_tool: Optional[str] = None
+
+    def is_privileged(self) -> bool:
+        return self.probe.is_root()
+
+    # ----------------------------------------------------------- shared readers
+
+    def _login_defs(self) -> Dict[str, str]:
+        text = self.probe.read_text("/etc/login.defs")
+        if text is None:
+            raise Unassessable("/etc/login.defs does not exist")
+        return parse_login_defs(text)
+
+    def _login_defs_int(self, key: str) -> Optional[int]:
+        raw = self._login_defs().get(key)
+        if raw is None:
+            return None
         try:
-            import distro
-            dist_info = f"{distro.name()} {distro.version()}"
-        except ImportError:
-            dist_info = "Unknown Linux Distribution"
+            return int(raw)
+        except ValueError as exc:
+            raise Unassessable(f"{key} in /etc/login.defs is not a number: {raw!r}") from exc
 
+    def _sshd_config(self) -> Dict[str, str]:
+        if self._sshd is not None:
+            return self._sshd
+        sshd = self.probe.which("sshd")
+        if sshd is None:
+            raise NotApplicable("OpenSSH server is not installed")
+        result = self.probe.run([sshd, "-T"]).require_ran()
+        if not result.ok or not result.stdout.strip():
+            detail = (result.stderr or result.stdout).strip().splitlines()
+            raise Unassessable("sshd -T failed" + (f": {detail[-1]}" if detail else ""))
+        self._sshd = parse_sshd_config(result.stdout)
+        return self._sshd
+
+    def _sshd_value(self, keyword: str) -> str:
+        value = self._sshd_config().get(keyword)
+        if value is None:
+            raise Unassessable(f"sshd -T did not report {keyword}")
+        return value
+
+    def _sysctl(self, key: str) -> str:
+        """Value of a kernel parameter from the running kernel."""
+        text = self.probe.read_text("/proc/sys/" + key.replace(".", "/"))
+        if text is None:
+            raise Unassessable(f"{key} is not present under /proc/sys")
+        return text.strip()
+
+    def _ipv6_enabled(self) -> bool:
+        return self.probe.exists("/proc/sys/net/ipv6/conf/all")
+
+    def _tmp_mount(self) -> Optional[Dict[str, object]]:
+        return self._mounts().get("/tmp")
+
+    def _installed(self, names: List[str]) -> List[str]:
+        """Subset of `names` that is installed, using dpkg or rpm."""
+        if self._package_tool is None:
+            if self.probe.which("dpkg-query"):
+                self._package_tool = "dpkg-query"
+            elif self.probe.which("rpm"):
+                self._package_tool = "rpm"
+            else:
+                raise Unassessable("no supported package manager found (dpkg or rpm)")
+        installed = []
+        for name in names:
+            if self._package_tool == "dpkg-query":
+                result = self.probe.run(["dpkg-query", "-W", "-f", "${db:Status-Status}", name]).require_ran()
+                is_installed = result.ok and result.stdout.strip() == "installed"
+            else:
+                result = self.probe.run(["rpm", "-q", name]).require_ran()
+                is_installed = result.ok
+            # Both tools exit 1 for "no such package". Anything else is a broken query.
+            if result.returncode not in (0, 1):
+                raise Unassessable(f"{self._package_tool} failed with exit code {result.returncode}")
+            if is_installed:
+                installed.append(name)
+        return installed
+
+    def _mounts(self) -> Dict[str, Dict[str, object]]:
+        text = self.probe.read_text("/proc/self/mountinfo")
+        if text is None:
+            raise Unassessable("/proc/self/mountinfo is not readable")
+        return parse_mountinfo(text)
+
+    def _local_mounts(self) -> List[str]:
+        """Mount points of local file systems, the same set `df --local` reports."""
+        mounts = [point for point, info in self._mounts().items()
+                  if info["fstype"] not in PSEUDO_FILESYSTEMS and info["fstype"] not in NETWORK_FILESYSTEMS
+                  and not str(info["fstype"]).startswith("fuse.")]
+        # Inside a chroot the root directory is not a mount point of its own.
+        return mounts if "/" in mounts else ["/"] + mounts
+
+    def _find(self, expression: List[str]) -> List[str]:
+        """Run find on every local file system. A timeout is never a clean result."""
+        found = set()
+        for mount in self._local_mounts():
+            result = self.probe.run(["find", mount, "-xdev", *expression, "-print0"], timeout=self.find_timeout)
+            if result.missing:
+                raise Unassessable("find is not installed")
+            if result.timed_out:
+                raise Unassessable(
+                    f"the search of {mount} did not finish within {self.find_timeout} seconds "
+                    "(raise it with --find-timeout)"
+                )
+            if result.returncode not in (0, 1):
+                raise Unassessable(f"find failed on {mount} with exit code {result.returncode}")
+            found.update(path for path in result.stdout.split("\0") if path)
+        return sorted(found)
+
+    # --------------------------------------------------------------- filesystem
+
+    def _module_disabled(self, name: str) -> Outcome:
+        """Can the kernel mount this file system type, now or by loading a module?"""
+        filesystems = self.probe.read_text("/proc/filesystems")
+        if filesystems is None:
+            raise Unassessable("/proc/filesystems is not readable")
+        if name in parse_filesystems(filesystems):
+            return failed(f"{name} is available in the running kernel (listed in /proc/filesystems)")
+        modules = self.probe.read_text("/proc/modules")
+        if modules is None:
+            return passed(f"{name} is not built in and this kernel has no loadable module support")
+        if any(line.split()[0] == name for line in modules.splitlines() if line.strip()):
+            return failed(f"the {name} module is loaded")
+        modprobe = self.probe.which("modprobe")
+        if modprobe is None:
+            raise Unassessable("modprobe is not installed, so kernel module policy cannot be read")
+        result = self.probe.run([modprobe, "-n", "-v", name]).require_ran()
+        output = result.stdout.strip()
+        first = output.splitlines()[0].strip() if output else ""
+        combined = (result.stdout + "\n" + result.stderr).lower()
+        if re.match(r"install\s+(/usr)?/bin/(true|false)\b", first):
+            return passed(f"loading {name} is disabled ({first})")
+        if result.returncode != 0 and re.search(rf"module\s+{re.escape(name)}\s+not found", combined):
+            return passed(f"the {name} module does not exist for this kernel")
+        if first.startswith("insmod"):
+            return failed(f"the {name} module can be loaded ({first})")
+        detail = (result.stderr or result.stdout).strip().splitlines()
+        raise Unassessable("unexpected modprobe output" + (f": {detail[-1]}" if detail else ""))
+
+    def cramfs_disabled(self) -> Outcome:
+        return self._module_disabled("cramfs")
+
+    def squashfs_disabled(self) -> Outcome:
+        return self._module_disabled("squashfs")
+
+    def udf_disabled(self) -> Outcome:
+        return self._module_disabled("udf")
+
+    def tmp_separate_mount(self) -> Outcome:
+        mount = self._tmp_mount()
+        if mount is None:
+            return failed("/tmp is not a separate mount")
+        return passed(f"/tmp is a separate {mount['fstype']} mount")
+
+    def _tmp_option(self, option: str) -> Outcome:
+        mount = self._tmp_mount()
+        if mount is None:
+            return failed(f"/tmp is not a separate mount, so {option} cannot be set")
+        options = sorted(mount["options"])
+        if option in mount["options"]:
+            return passed(f"/tmp mount options: {','.join(options)}")
+        return failed(f"{option} is missing from the /tmp mount options: {','.join(options)}")
+
+    def tmp_noexec(self) -> Outcome:
+        return self._tmp_option("noexec")
+
+    def tmp_nodev(self) -> Outcome:
+        return self._tmp_option("nodev")
+
+    def tmp_nosuid(self) -> Outcome:
+        return self._tmp_option("nosuid")
+
+    # ----------------------------------------------------------- authentication
+
+    def password_max_days(self) -> Outcome:
+        days = self._login_defs_int("PASS_MAX_DAYS")
+        if days is None:
+            return failed("PASS_MAX_DAYS is not set in /etc/login.defs")
+        if 1 <= days <= 365:
+            return passed(f"PASS_MAX_DAYS = {days}")
+        return failed(f"PASS_MAX_DAYS = {days}")
+
+    def password_min_days(self) -> Outcome:
+        days = self._login_defs_int("PASS_MIN_DAYS")
+        if days is None:
+            return failed("PASS_MIN_DAYS is not set in /etc/login.defs")
+        return passed(f"PASS_MIN_DAYS = {days}") if days >= 1 else failed(f"PASS_MIN_DAYS = {days}")
+
+    def password_warn_age(self) -> Outcome:
+        days = self._login_defs_int("PASS_WARN_AGE")
+        if days is None:
+            return failed("PASS_WARN_AGE is not set in /etc/login.defs")
+        return passed(f"PASS_WARN_AGE = {days}") if days >= 7 else failed(f"PASS_WARN_AGE = {days}")
+
+    def inactive_password_lock(self) -> Outcome:
+        raw = None
+        defaults = self.probe.read_text("/etc/default/useradd")
+        if defaults is not None:
+            raw = parse_assignments(defaults).get("INACTIVE")
+        if raw is None:
+            useradd = self.probe.which("useradd")
+            if useradd is None:
+                raise Unassessable("useradd is not installed and /etc/default/useradd has no INACTIVE value")
+            result = self.probe.run([useradd, "-D"]).require_ran()
+            if not result.ok:
+                raise Unassessable("useradd -D failed")
+            raw = parse_assignments(result.stdout).get("INACTIVE")
+        if raw is None:
+            raise Unassessable("the useradd defaults do not report INACTIVE")
         try:
-            hostname = os.uname().nodename
-            kernel = os.uname().release
-            arch = os.uname().machine
-        except Exception:
-            hostname = "Unknown"
-            kernel = "Unknown"
-            arch = "Unknown"
+            days = int(raw)
+        except ValueError as exc:
+            raise Unassessable(f"INACTIVE is not a number: {raw!r}") from exc
+        if days < 0:
+            return failed(f"INACTIVE = {days} (inactive accounts are never locked)")
+        return passed(f"INACTIVE = {days}") if days <= 30 else failed(f"INACTIVE = {days}")
 
-        return {
-            'hostname': hostname,
-            'kernel': kernel,
-            'distribution': dist_info,
-            'architecture': arch
-        }
+    def root_only_uid0(self) -> Outcome:
+        text = self.probe.read_text("/etc/passwd")
+        if text is None:
+            raise Unassessable("/etc/passwd does not exist")
+        names = parse_passwd_uid0(text)
+        if names == ["root"]:
+            return passed("root is the only UID 0 account")
+        if not names:
+            return failed("no account has UID 0")
+        return failed(f"UID 0 accounts: {', '.join(names)}")
 
-    def _run_command(self, command: str) -> tuple:
-        """Execute a shell command and return output"""
-        try:
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=30
+    def root_console_restricted(self) -> Outcome:
+        pam = self.probe.read_text("/etc/pam.d/login")
+        in_use = pam is not None and any(
+            "pam_securetty" in line and not line.strip().startswith("#") for line in pam.splitlines()
+        )
+        if not in_use:
+            raise NotApplicable(
+                "pam_securetty is not enabled in /etc/pam.d/login, so /etc/securetty is not consulted on this host"
             )
-            return result.returncode, result.stdout.strip(), result.stderr.strip()
-        except subprocess.TimeoutExpired:
-            return -1, '', 'Command timed out'
-        except Exception as e:
-            return -1, '', str(e)
+        securetty = self.probe.read_text("/etc/securetty")
+        if securetty is None:
+            return failed(
+                "pam_securetty is enabled but /etc/securetty does not exist, so root may log in on any terminal")
+        terminals = [line.strip() for line in securetty.splitlines()
+                     if line.strip() and not line.strip().startswith("#")]
+        if not terminals:
+            return passed("/etc/securetty is empty, so root cannot log in on any terminal directly")
+        return manual(f"{len(terminals)} terminals are listed in /etc/securetty: {_sample(terminals)}")
 
-    def _check_sysctl(self, param: str, expected: str) -> bool:
-        """Check a sysctl parameter value"""
-        code, output, _ = self._run_command(f"sysctl -n {param} 2>/dev/null")
-        return output == expected
+    def ssh_root_login_disabled(self) -> Outcome:
+        value = self._sshd_value("permitrootlogin")
+        return passed("PermitRootLogin no") if value == "no" else failed(f"PermitRootLogin {value}")
 
-    def _check_module_disabled(self, module: str) -> bool:
-        """Check if a kernel module is disabled"""
-        code, output, _ = self._run_command(f"modprobe -n -v {module} 2>&1")
-        if 'install /bin/true' in output or 'install /bin/false' in output:
-            return True
-        code2, output2, _ = self._run_command(f"lsmod | grep {module}")
-        return code2 != 0 and output2 == ''
+    def ssh_empty_passwords_disabled(self) -> Outcome:
+        value = self._sshd_value("permitemptypasswords")
+        return passed("PermitEmptyPasswords no") if value == "no" else failed(f"PermitEmptyPasswords {value}")
 
-    def _check_package_installed(self, package: str) -> bool:
-        """Check if a package is installed"""
-        # Check Debian/Ubuntu
-        code, _, _ = self._run_command(f"dpkg -s {package} 2>/dev/null | grep -q 'Status: install'")
-        if code == 0:
-            return True
-        # Check RHEL/CentOS
-        code, _, _ = self._run_command(f"rpm -q {package} 2>/dev/null")
-        return code == 0
+    def ssh_password_authentication_review(self) -> Outcome:
+        value = self._sshd_value("passwordauthentication")
+        if value == "no":
+            return passed("PasswordAuthentication no")
+        return manual(f"PasswordAuthentication {value}. Confirm that site policy allows password logins over SSH")
 
-    def _check_ssh_config(self, param: str, expected: str) -> bool:
-        """Check SSH configuration parameter"""
-        code, output, _ = self._run_command(f"sshd -T 2>/dev/null | grep -i '^{param}'")
-        if output:
-            value = output.split()[-1].lower()
-            return value == expected.lower()
-        return False
-
-    def _check_file_permissions(self, filepath: str, max_mode: int) -> bool:
-        """Check that file permissions don't exceed max_mode"""
+    def ssh_max_auth_tries(self) -> Outcome:
+        raw = self._sshd_value("maxauthtries")
         try:
-            file_stat = os.stat(filepath)
-            actual_mode = stat.S_IMODE(file_stat.st_mode)
-            return actual_mode <= max_mode
-        except (FileNotFoundError, PermissionError):
-            return False
+            tries = int(raw)
+        except ValueError as exc:
+            raise Unassessable(f"MaxAuthTries is not a number: {raw!r}") from exc
+        return passed(f"MaxAuthTries {tries}") if tries <= 4 else failed(f"MaxAuthTries {tries}")
 
-    # ==================== FILESYSTEM CHECKS ====================
+    # ------------------------------------------------------------------ network
 
-    def check_cramfs_disabled(self) -> Dict:
-        """CIS 1.1.1.1 - Ensure mounting of cramfs is disabled"""
-        passed = self._check_module_disabled('cramfs')
-        return {
-            'passed': passed,
-            'actual': 'Module disabled' if passed else 'Module may be loadable',
-            'expected': 'cramfs module should be disabled',
-            'remediation': 'Add "install cramfs /bin/true" to /etc/modprobe.d/cramfs.conf'
-        }
+    def _sysctl_all_equal(self, keys: List[str], wanted: str, ipv6_keys: Optional[List[str]] = None) -> Outcome:
+        readings = [(key, self._sysctl(key)) for key in keys]
+        note = ""
+        if ipv6_keys:
+            if self._ipv6_enabled():
+                readings += [(key, self._sysctl(key)) for key in ipv6_keys]
+            else:
+                note = "; IPv6 is not enabled"
+        actual = ", ".join(f"{key} = {value}" for key, value in readings) + note
+        return passed(actual) if all(value == wanted for _, value in readings) else failed(actual)
 
-    def check_squashfs_disabled(self) -> Dict:
-        """CIS 1.1.1.3 - Ensure mounting of squashfs is disabled"""
-        passed = self._check_module_disabled('squashfs')
-        return {
-            'passed': passed,
-            'actual': 'Module disabled' if passed else 'Module may be loadable',
-            'expected': 'squashfs module should be disabled',
-            'remediation': 'Add "install squashfs /bin/true" to /etc/modprobe.d/squashfs.conf'
-        }
+    def ip_forwarding_disabled(self) -> Outcome:
+        return self._sysctl_all_equal(["net.ipv4.ip_forward"], "0", ["net.ipv6.conf.all.forwarding"])
 
-    def check_udf_disabled(self) -> Dict:
-        """CIS 1.1.1.4 - Ensure mounting of udf is disabled"""
-        passed = self._check_module_disabled('udf')
-        return {
-            'passed': passed,
-            'actual': 'Module disabled' if passed else 'Module may be loadable',
-            'expected': 'udf module should be disabled',
-            'remediation': 'Add "install udf /bin/true" to /etc/modprobe.d/udf.conf'
-        }
+    def send_redirects_disabled(self) -> Outcome:
+        return self._sysctl_all_equal(
+            ["net.ipv4.conf.all.send_redirects", "net.ipv4.conf.default.send_redirects"], "0")
 
-    def check_tmp_partition(self) -> Dict:
-        """CIS 1.1.2 - Ensure /tmp is a separate partition"""
-        code, output, _ = self._run_command("findmnt -n /tmp")
-        passed = code == 0 and '/tmp' in output
-        return {
-            'passed': passed,
-            'actual': output if output else '/tmp is not a separate partition',
-            'expected': '/tmp should be a separate partition',
-            'remediation': 'Configure /tmp as a separate partition or use tmpfs'
-        }
+    def source_route_rejected(self) -> Outcome:
+        return self._sysctl_all_equal(
+            ["net.ipv4.conf.all.accept_source_route", "net.ipv4.conf.default.accept_source_route"], "0",
+            ["net.ipv6.conf.all.accept_source_route", "net.ipv6.conf.default.accept_source_route"])
 
-    def check_tmp_noexec(self) -> Dict:
-        """CIS 1.1.3 - Ensure noexec option set on /tmp"""
-        code, output, _ = self._run_command("findmnt -n /tmp | grep noexec")
-        passed = code == 0
-        return {
-            'passed': passed,
-            'actual': 'noexec set' if passed else 'noexec not set',
-            'expected': '/tmp should have noexec option',
-            'remediation': 'Add noexec option to /tmp mount in /etc/fstab'
-        }
+    def icmp_redirects_rejected(self) -> Outcome:
+        return self._sysctl_all_equal(
+            ["net.ipv4.conf.all.accept_redirects", "net.ipv4.conf.default.accept_redirects"], "0",
+            ["net.ipv6.conf.all.accept_redirects", "net.ipv6.conf.default.accept_redirects"])
 
-    def check_tmp_nodev(self) -> Dict:
-        """CIS 1.1.4 - Ensure nodev option set on /tmp"""
-        code, output, _ = self._run_command("findmnt -n /tmp | grep nodev")
-        passed = code == 0
-        return {
-            'passed': passed,
-            'actual': 'nodev set' if passed else 'nodev not set',
-            'expected': '/tmp should have nodev option',
-            'remediation': 'Add nodev option to /tmp mount in /etc/fstab'
-        }
+    def icmp_broadcast_ignored(self) -> Outcome:
+        return self._sysctl_all_equal(["net.ipv4.icmp_echo_ignore_broadcasts"], "1")
 
-    def check_tmp_nosuid(self) -> Dict:
-        """CIS 1.1.5 - Ensure nosuid option set on /tmp"""
-        code, output, _ = self._run_command("findmnt -n /tmp | grep nosuid")
-        passed = code == 0
-        return {
-            'passed': passed,
-            'actual': 'nosuid set' if passed else 'nosuid not set',
-            'expected': '/tmp should have nosuid option',
-            'remediation': 'Add nosuid option to /tmp mount in /etc/fstab'
-        }
+    def syn_cookies_enabled(self) -> Outcome:
+        return self._sysctl_all_equal(["net.ipv4.tcp_syncookies"], "1")
 
-    # ==================== AUTHENTICATION CHECKS ====================
+    def firewall_active(self) -> Outcome:
+        inactive: List[str] = []
+        unreadable: List[str] = []
+        tools = 0
 
-    def check_password_max_days(self) -> Dict:
-        """CIS 5.5.1.1 - Ensure password expiration is 365 days or less"""
-        code, output, _ = self._run_command("grep ^PASS_MAX_DAYS /etc/login.defs")
-        try:
-            days = int(output.split()[-1]) if output else 99999
-            passed = days <= 365
-        except (ValueError, IndexError):
-            days = 'Unable to parse'
-            passed = False
-        return {
-            'passed': passed,
-            'actual': f'PASS_MAX_DAYS = {days}',
-            'expected': 'PASS_MAX_DAYS <= 365',
-            'remediation': 'Set PASS_MAX_DAYS to 365 or less in /etc/login.defs'
-        }
+        ufw = self.probe.which("ufw")
+        if ufw:
+            tools += 1
+            result = self.probe.run([ufw, "status"]).require_ran()
+            if result.ok and re.search(r"^Status:\s*active", result.stdout, re.M):
+                return passed("ufw is active")
+            (inactive if result.ok else unreadable).append("ufw is inactive" if result.ok else "ufw status failed")
 
-    def check_password_min_days(self) -> Dict:
-        """CIS 5.5.1.2 - Ensure minimum days between password changes"""
-        code, output, _ = self._run_command("grep ^PASS_MIN_DAYS /etc/login.defs")
-        try:
-            days = int(output.split()[-1]) if output else 0
-            passed = days >= 1
-        except (ValueError, IndexError):
-            days = 'Unable to parse'
-            passed = False
-        return {
-            'passed': passed,
-            'actual': f'PASS_MIN_DAYS = {days}',
-            'expected': 'PASS_MIN_DAYS >= 1',
-            'remediation': 'Set PASS_MIN_DAYS to 1 or more in /etc/login.defs'
-        }
+        firewall_cmd = self.probe.which("firewall-cmd")
+        if firewall_cmd:
+            tools += 1
+            result = self.probe.run([firewall_cmd, "--state"]).require_ran()
+            if result.ok and "running" in result.stdout:
+                return passed("firewalld is running")
+            inactive.append("firewalld is not running")
 
-    def check_password_warn_age(self) -> Dict:
-        """CIS 5.5.1.3 - Ensure password expiration warning is 7 days"""
-        code, output, _ = self._run_command("grep ^PASS_WARN_AGE /etc/login.defs")
-        try:
-            days = int(output.split()[-1]) if output else 0
-            passed = days >= 7
-        except (ValueError, IndexError):
-            days = 'Unable to parse'
-            passed = False
-        return {
-            'passed': passed,
-            'actual': f'PASS_WARN_AGE = {days}',
-            'expected': 'PASS_WARN_AGE >= 7',
-            'remediation': 'Set PASS_WARN_AGE to 7 or more in /etc/login.defs'
-        }
+        nft = self.probe.which("nft")
+        if nft:
+            tools += 1
+            result = self.probe.run([nft, "list", "ruleset"]).require_ran()
+            if result.ok and re.search(r"hook\s+input", result.stdout):
+                return passed("nftables has a rule set with an input hook")
+            (inactive if result.ok else unreadable).append(
+                "nftables has no input chain" if result.ok else "nft list ruleset failed")
 
-    def check_inactive_lock(self) -> Dict:
-        """CIS 5.5.1.4 - Ensure inactive password lock is 30 days or less"""
-        code, output, _ = self._run_command("useradd -D | grep INACTIVE")
-        try:
-            days = int(output.split('=')[-1]) if output and '=' in output else -1
-            passed = 0 < days <= 30
-        except (ValueError, IndexError):
-            days = 'Unable to parse'
-            passed = False
-        return {
-            'passed': passed,
-            'actual': f'INACTIVE = {days}',
-            'expected': 'INACTIVE between 1 and 30',
-            'remediation': 'Run: useradd -D -f 30'
-        }
+        iptables = self.probe.which("iptables")
+        if iptables:
+            tools += 1
+            result = self.probe.run([iptables, "-S"]).require_ran()
+            if result.ok:
+                lines = result.stdout.splitlines()
+                rules = [line for line in lines if line.startswith("-A")]
+                drops = [line for line in lines if re.match(r"-P (INPUT|FORWARD) DROP", line)]
+                if rules or drops:
+                    return passed(f"iptables has {len(rules)} rules and {len(drops)} default-drop policies")
+                inactive.append("iptables has no rules and accepts by default")
+            else:
+                unreadable.append("iptables -S failed")
 
-    def check_root_only_uid0(self) -> Dict:
-        """CIS 5.4.3 - Ensure root is the only UID 0 account"""
-        code, output, _ = self._run_command("awk -F: '($3 == 0) { print $1 }' /etc/passwd")
-        uid0_accounts = output.split('\n') if output else []
-        uid0_accounts = [a for a in uid0_accounts if a]
-        passed = uid0_accounts == ['root']
-        return {
-            'passed': passed,
-            'actual': f'UID 0 accounts: {", ".join(uid0_accounts) if uid0_accounts else "none"}',
-            'expected': 'Only root should have UID 0',
-            'remediation': 'Remove or change UID of any non-root UID 0 accounts'
-        }
+        if tools == 0:
+            return failed("no firewall tool is installed (ufw, firewalld, nftables or iptables)")
+        if unreadable:
+            raise Unassessable("; ".join(unreadable + inactive))
+        return failed("; ".join(inactive))
 
-    def check_root_console_only(self) -> Dict:
-        """CIS 5.4.4 - Ensure root login is restricted to console"""
-        securetty_exists = os.path.exists('/etc/securetty')
-        return {
-            'passed': securetty_exists,
-            'actual': '/etc/securetty exists' if securetty_exists else '/etc/securetty not found',
-            'expected': '/etc/securetty should exist and restrict root login',
-            'remediation': 'Create /etc/securetty with allowed consoles'
-        }
+    # ------------------------------------------------------------------ logging
 
-    def check_ssh_root_login(self) -> Dict:
-        """CIS 5.2.10 - Ensure SSH root login is disabled"""
-        passed = self._check_ssh_config('permitrootlogin', 'no')
-        code, output, _ = self._run_command("sshd -T 2>/dev/null | grep -i permitrootlogin")
-        return {
-            'passed': passed,
-            'actual': output if output else 'Unable to determine',
-            'expected': 'PermitRootLogin no',
-            'remediation': 'Set PermitRootLogin no in /etc/ssh/sshd_config'
-        }
+    def rsyslog_installed(self) -> Outcome:
+        if self._installed(["rsyslog"]):
+            return passed("rsyslog is installed")
+        return failed("rsyslog is not installed")
 
-    def check_ssh_empty_passwords(self) -> Dict:
-        """CIS 5.2.11 - Ensure SSH PermitEmptyPasswords is disabled"""
-        passed = self._check_ssh_config('permitemptypasswords', 'no')
-        code, output, _ = self._run_command("sshd -T 2>/dev/null | grep -i permitemptypasswords")
-        return {
-            'passed': passed,
-            'actual': output if output else 'Unable to determine',
-            'expected': 'PermitEmptyPasswords no',
-            'remediation': 'Set PermitEmptyPasswords no in /etc/ssh/sshd_config'
-        }
+    def rsyslog_enabled(self) -> Outcome:
+        if not self._installed(["rsyslog"]):
+            return failed("rsyslog is not installed")
+        systemctl = self.probe.which("systemctl")
+        if systemctl is None:
+            raise Unassessable("systemctl is not installed")
+        result = self.probe.run([systemctl, "is-enabled", "rsyslog"]).require_ran()
+        state = result.stdout.strip().splitlines()[0] if result.stdout.strip() else ""
+        if state in ("enabled", "enabled-runtime", "alias", "static"):
+            return passed(f"rsyslog unit state: {state}")
+        if state in ("disabled", "masked", "masked-runtime", "indirect"):
+            return failed(f"rsyslog unit state: {state}")
+        detail = (result.stderr or result.stdout).strip().splitlines()
+        raise Unassessable("systemctl is-enabled gave no usable answer" + (f": {detail[-1]}" if detail else ""))
 
-    def check_ssh_password_auth(self) -> Dict:
-        """CIS 5.2.12 - Ensure SSH PasswordAuthentication is configured"""
-        # Note: Some environments require password auth, so we just check it's explicitly configured
-        code, output, _ = self._run_command("sshd -T 2>/dev/null | grep -i passwordauthentication")
-        has_config = bool(output)
-        return {
-            'passed': has_config,
-            'actual': output if output else 'PasswordAuthentication not explicitly configured',
-            'expected': 'PasswordAuthentication should be explicitly configured',
-            'remediation': 'Set PasswordAuthentication yes or no explicitly in /etc/ssh/sshd_config'
-        }
+    def _journald_setting(self, key: str) -> Optional[str]:
+        main = self.probe.read_text("/etc/systemd/journald.conf")
+        present = main is not None or any(
+            self.probe.exists(p) for p in ("/usr/lib/systemd/systemd-journald", "/lib/systemd/systemd-journald"))
+        if not present:
+            raise NotApplicable("systemd-journald is not installed")
+        value = parse_assignments(main or "").get(key)
+        dropins: Dict[str, str] = {}
+        for directory in ("/usr/lib/systemd/journald.conf.d", "/run/systemd/journald.conf.d",
+                          "/etc/systemd/journald.conf.d"):
+            for name in self.probe.list_dir(directory):
+                if name.endswith(".conf"):
+                    dropins[name] = f"{directory}/{name}"   # later directories override earlier ones
+        for name in sorted(dropins):
+            text = self.probe.read_text(dropins[name])
+            if text is not None and key in parse_assignments(text):
+                value = parse_assignments(text)[key]
+        return value
 
-    def check_ssh_max_auth_tries(self) -> Dict:
-        """CIS 5.2.7 - Ensure SSH MaxAuthTries is set to 4 or less"""
-        code, output, _ = self._run_command("sshd -T 2>/dev/null | grep -i maxauthtries")
-        try:
-            value = int(output.split()[-1]) if output else 6
-            passed = value <= 4
-        except (ValueError, IndexError):
-            value = 'Unable to parse'
-            passed = False
-        return {
-            'passed': passed,
-            'actual': f'MaxAuthTries = {value}',
-            'expected': 'MaxAuthTries <= 4',
-            'remediation': 'Set MaxAuthTries 4 in /etc/ssh/sshd_config'
-        }
+    def journald_compress(self) -> Outcome:
+        value = self._journald_setting("Compress")
+        if value is None:
+            return failed("Compress is not set in the journald configuration")
+        return passed(f"Compress={value}") if value.lower() in _TRUE_WORDS else failed(f"Compress={value}")
 
-    # ==================== NETWORK CHECKS ====================
+    def journald_persistent(self) -> Outcome:
+        value = self._journald_setting("Storage")
+        if value is None:
+            return failed("Storage is not set in the journald configuration")
+        return passed(f"Storage={value}") if value.lower() == "persistent" else failed(f"Storage={value}")
 
-    def check_ip_forwarding(self) -> Dict:
-        """CIS 3.1.1 - Ensure IP forwarding is disabled"""
-        ipv4 = self._check_sysctl('net.ipv4.ip_forward', '0')
-        ipv6 = self._check_sysctl('net.ipv6.conf.all.forwarding', '0')
-        passed = ipv4 and ipv6
-        return {
-            'passed': passed,
-            'actual': f'IPv4 forwarding: {"disabled" if ipv4 else "enabled"}, IPv6: {"disabled" if ipv6 else "enabled"}',
-            'expected': 'IP forwarding should be disabled',
-            'remediation': 'Set net.ipv4.ip_forward=0 and net.ipv6.conf.all.forwarding=0 in /etc/sysctl.conf'
-        }
+    def var_log_permissions(self) -> Outcome:
+        info = self.probe.stat("/var/log")
+        if info is None:
+            raise Unassessable("/var/log does not exist")
+        actual = f"mode {info.mode:04o}, owner {info.owner}:{info.group}"
+        good = info.uid == 0 and (info.gid == 0 or info.group in ("adm", "syslog")) and mode_within(info.mode, 0o775)
+        return passed(actual) if good else failed(actual)
 
-    def check_send_redirects(self) -> Dict:
-        """CIS 3.1.2 - Ensure packet redirect sending is disabled"""
-        all_redirect = self._check_sysctl('net.ipv4.conf.all.send_redirects', '0')
-        default_redirect = self._check_sysctl('net.ipv4.conf.default.send_redirects', '0')
-        passed = all_redirect and default_redirect
-        return {
-            'passed': passed,
-            'actual': f'all: {"0" if all_redirect else "1"}, default: {"0" if default_redirect else "1"}',
-            'expected': 'send_redirects = 0 for all and default',
-            'remediation': 'Set net.ipv4.conf.all.send_redirects=0 in /etc/sysctl.conf'
-        }
+    # ----------------------------------------------------------- access control
 
-    def check_source_route(self) -> Dict:
-        """CIS 3.2.1 - Ensure source routed packets are not accepted"""
-        all_sr = self._check_sysctl('net.ipv4.conf.all.accept_source_route', '0')
-        default_sr = self._check_sysctl('net.ipv4.conf.default.accept_source_route', '0')
-        passed = all_sr and default_sr
-        return {
-            'passed': passed,
-            'actual': f'all: {"0" if all_sr else "1"}, default: {"0" if default_sr else "1"}',
-            'expected': 'accept_source_route = 0',
-            'remediation': 'Set net.ipv4.conf.all.accept_source_route=0 in /etc/sysctl.conf'
-        }
+    def _file_permissions(self, path: str, limit: int, groups: List[str]) -> Outcome:
+        info = self.probe.stat(path)
+        if info is None:
+            raise Unassessable(f"{path} does not exist")
+        actual = f"mode {info.mode:04o}, owner {info.owner}:{info.group}"
+        group_ok = info.gid == 0 or info.group in groups
+        good = info.uid == 0 and group_ok and mode_within(info.mode, limit)
+        return passed(actual) if good else failed(actual)
 
-    def check_icmp_redirects(self) -> Dict:
-        """CIS 3.2.2 - Ensure ICMP redirects are not accepted"""
-        all_redir = self._check_sysctl('net.ipv4.conf.all.accept_redirects', '0')
-        default_redir = self._check_sysctl('net.ipv4.conf.default.accept_redirects', '0')
-        passed = all_redir and default_redir
-        return {
-            'passed': passed,
-            'actual': f'all: {"0" if all_redir else "1"}, default: {"0" if default_redir else "1"}',
-            'expected': 'accept_redirects = 0',
-            'remediation': 'Set net.ipv4.conf.all.accept_redirects=0 in /etc/sysctl.conf'
-        }
+    def passwd_permissions(self) -> Outcome:
+        return self._file_permissions("/etc/passwd", 0o644, [])
 
-    def check_icmp_broadcast(self) -> Dict:
-        """CIS 3.2.5 - Ensure broadcast ICMP requests are ignored"""
-        passed = self._check_sysctl('net.ipv4.icmp_echo_ignore_broadcasts', '1')
-        return {
-            'passed': passed,
-            'actual': 'Broadcast ICMP ignored' if passed else 'Broadcast ICMP accepted',
-            'expected': 'icmp_echo_ignore_broadcasts = 1',
-            'remediation': 'Set net.ipv4.icmp_echo_ignore_broadcasts=1 in /etc/sysctl.conf'
-        }
+    def shadow_permissions(self) -> Outcome:
+        return self._file_permissions("/etc/shadow", 0o640, ["shadow"])
 
-    def check_syn_cookies(self) -> Dict:
-        """CIS 3.2.8 - Ensure TCP SYN Cookies are enabled"""
-        passed = self._check_sysctl('net.ipv4.tcp_syncookies', '1')
-        return {
-            'passed': passed,
-            'actual': 'SYN cookies enabled' if passed else 'SYN cookies disabled',
-            'expected': 'tcp_syncookies = 1',
-            'remediation': 'Set net.ipv4.tcp_syncookies=1 in /etc/sysctl.conf'
-        }
+    def group_permissions(self) -> Outcome:
+        return self._file_permissions("/etc/group", 0o644, [])
 
-    def check_firewall_active(self) -> Dict:
-        """CIS 3.4.1.1 - Ensure firewall is active"""
-        # Check for ufw, firewalld, or iptables
-        code_ufw, _, _ = self._run_command("ufw status | grep -q 'Status: active'")
-        code_firewalld, _, _ = self._run_command("systemctl is-active firewalld 2>/dev/null")
-        code_iptables, output_iptables, _ = self._run_command("iptables -L -n 2>/dev/null | grep -c '^'")
+    def no_world_writable_files(self) -> Outcome:
+        files = self._find(["-type", "f", "-perm", "-0002"])
+        if not files:
+            return passed("no world writable files on local file systems")
+        return failed(f"{len(files)} world writable files, for example: {_sample(files)}")
 
-        ufw_active = code_ufw == 0
-        firewalld_active = code_firewalld == 0
-        iptables_rules = int(output_iptables) > 8 if output_iptables.isdigit() else False
+    def no_unowned_files(self) -> Outcome:
+        paths = self._find(["(", "-nouser", "-o", "-nogroup", ")"])
+        if not paths:
+            return passed("every file and directory on local file systems has an owner and a group")
+        return failed(f"{len(paths)} paths without a valid owner or group, for example: {_sample(paths)}")
 
-        passed = ufw_active or firewalld_active or iptables_rules
-        return {
-            'passed': passed,
-            'actual': f'ufw: {ufw_active}, firewalld: {firewalld_active}, iptables rules: {iptables_rules}',
-            'expected': 'At least one firewall should be active',
-            'remediation': 'Enable ufw: sudo ufw enable'
-        }
+    def suid_sgid_review(self) -> Outcome:
+        files = self._find(["-type", "f", "(", "-perm", "-4000", "-o", "-perm", "-2000", ")"])
+        if not files:
+            return passed("no SUID or SGID files on local file systems")
+        return manual(f"{len(files)} SUID or SGID files to compare with your baseline, for example: {_sample(files)}")
 
-    # ==================== LOGGING CHECKS ====================
+    # ----------------------------------------------------------------- services
 
-    def check_rsyslog_installed(self) -> Dict:
-        """CIS 4.2.1.1 - Ensure rsyslog is installed"""
-        passed = self._check_package_installed('rsyslog')
-        return {
-            'passed': passed,
-            'actual': 'rsyslog installed' if passed else 'rsyslog not installed',
-            'expected': 'rsyslog should be installed',
-            'remediation': 'Install rsyslog: apt install rsyslog'
-        }
+    def _must_be_absent(self, label: str, packages: List[str]) -> Outcome:
+        installed = self._installed(packages)
+        if installed:
+            return failed(f"{label} installed: {', '.join(installed)}")
+        return passed(f"no {label} package is installed")
 
-    def check_rsyslog_enabled(self) -> Dict:
-        """CIS 4.2.1.2 - Ensure rsyslog service is enabled"""
-        code, output, _ = self._run_command("systemctl is-enabled rsyslog 2>/dev/null")
-        passed = output == 'enabled'
-        return {
-            'passed': passed,
-            'actual': output if output else 'Unable to determine',
-            'expected': 'rsyslog should be enabled',
-            'remediation': 'Enable rsyslog: systemctl enable rsyslog'
-        }
+    def _absent_unless_required(self, label: str, packages: List[str]) -> Outcome:
+        installed = self._installed(packages)
+        if installed:
+            return manual(f"{label} installed: {', '.join(installed)}. Confirm that this host needs it")
+        return passed(f"no {label} package is installed")
 
-    def check_journald_compress(self) -> Dict:
-        """CIS 4.2.2.1 - Ensure journald is configured to compress logs"""
-        code, output, _ = self._run_command("grep -E '^Compress=' /etc/systemd/journald.conf 2>/dev/null")
-        passed = 'Compress=yes' in output if output else False
-        return {
-            'passed': passed,
-            'actual': output if output else 'Compress not configured',
-            'expected': 'Compress=yes in journald.conf',
-            'remediation': 'Set Compress=yes in /etc/systemd/journald.conf'
-        }
+    def xinetd_not_installed(self) -> Outcome:
+        return self._must_be_absent("xinetd", ["xinetd"])
 
-    def check_journald_persistent(self) -> Dict:
-        """CIS 4.2.2.2 - Ensure journald is configured to write to persistent storage"""
-        code, output, _ = self._run_command("grep -E '^Storage=' /etc/systemd/journald.conf 2>/dev/null")
-        passed = 'Storage=persistent' in output if output else False
-        return {
-            'passed': passed,
-            'actual': output if output else 'Storage not configured',
-            'expected': 'Storage=persistent in journald.conf',
-            'remediation': 'Set Storage=persistent in /etc/systemd/journald.conf'
-        }
+    def telnet_server_not_installed(self) -> Outcome:
+        return self._must_be_absent("telnet server", ["telnetd", "inetutils-telnetd", "telnetd-ssl", "telnet-server"])
 
-    def check_var_log_permissions(self) -> Dict:
-        """CIS 4.2.3 - Ensure permissions on /var/log are configured"""
-        passed = self._check_file_permissions('/var/log', 0o755)
-        code, output, _ = self._run_command("stat -c '%a' /var/log 2>/dev/null")
-        return {
-            'passed': passed,
-            'actual': f'Permissions: {output}' if output else 'Unable to determine',
-            'expected': 'Permissions should be 755 or more restrictive',
-            'remediation': 'Set correct permissions: chmod 755 /var/log'
-        }
+    def ftp_server_not_installed(self) -> Outcome:
+        return self._must_be_absent("FTP server", ["vsftpd", "proftpd-basic", "proftpd-core", "proftpd", "pure-ftpd"])
 
-    # ==================== ACCESS CONTROL CHECKS ====================
+    def http_server_review(self) -> Outcome:
+        return self._absent_unless_required(
+            "web server", ["apache2", "nginx", "nginx-core", "nginx-full", "nginx-light", "lighttpd", "httpd"])
 
-    def check_passwd_permissions(self) -> Dict:
-        """CIS 6.1.2 - Ensure permissions on /etc/passwd are configured"""
-        passed = self._check_file_permissions('/etc/passwd', 0o644)
-        code, output, _ = self._run_command("stat -c '%a %U %G' /etc/passwd 2>/dev/null")
-        return {
-            'passed': passed,
-            'actual': output if output else 'Unable to determine',
-            'expected': '644 root root',
-            'remediation': 'Run: chmod 644 /etc/passwd && chown root:root /etc/passwd'
-        }
+    def ldap_server_review(self) -> Outcome:
+        return self._absent_unless_required("LDAP server", ["slapd", "openldap-servers"])
 
-    def check_shadow_permissions(self) -> Dict:
-        """CIS 6.1.3 - Ensure permissions on /etc/shadow are configured"""
-        passed = self._check_file_permissions('/etc/shadow', 0o640)
-        code, output, _ = self._run_command("stat -c '%a %U %G' /etc/shadow 2>/dev/null")
-        return {
-            'passed': passed,
-            'actual': output if output else 'Unable to determine',
-            'expected': '640 root shadow (or more restrictive)',
-            'remediation': 'Run: chmod 640 /etc/shadow && chown root:shadow /etc/shadow'
-        }
-
-    def check_group_permissions(self) -> Dict:
-        """CIS 6.1.4 - Ensure permissions on /etc/group are configured"""
-        passed = self._check_file_permissions('/etc/group', 0o644)
-        code, output, _ = self._run_command("stat -c '%a %U %G' /etc/group 2>/dev/null")
-        return {
-            'passed': passed,
-            'actual': output if output else 'Unable to determine',
-            'expected': '644 root root',
-            'remediation': 'Run: chmod 644 /etc/group && chown root:root /etc/group'
-        }
-
-    def check_world_writable(self) -> Dict:
-        """CIS 6.1.10 - Ensure no world-writable files exist"""
-        code, output, _ = self._run_command(
-            "df --local -P 2>/dev/null | awk 'NR!=1 {print $6}' | "
-            "xargs -I '{}' find '{}' -xdev -type f -perm -0002 2>/dev/null | head -10"
-        )
-        files = output.split('\n') if output else []
-        files = [f for f in files if f]
-        passed = len(files) == 0
-        return {
-            'passed': passed,
-            'actual': f'{len(files)} world-writable files found' + (f': {", ".join(files[:5])}' if files else ''),
-            'expected': 'No world-writable files',
-            'remediation': 'Remove world-writable permission: chmod o-w <file>'
-        }
-
-    def check_unowned_files(self) -> Dict:
-        """CIS 6.1.11 - Ensure no unowned files exist"""
-        code, output, _ = self._run_command(
-            "df --local -P 2>/dev/null | awk 'NR!=1 {print $6}' | "
-            "xargs -I '{}' find '{}' -xdev -nouser 2>/dev/null | head -10"
-        )
-        files = output.split('\n') if output else []
-        files = [f for f in files if f]
-        passed = len(files) == 0
-        return {
-            'passed': passed,
-            'actual': f'{len(files)} unowned files found' + (f': {", ".join(files[:5])}' if files else ''),
-            'expected': 'No unowned files',
-            'remediation': 'Assign ownership to files: chown <owner>:<group> <file>'
-        }
-
-    def check_suid_sgid_files(self) -> Dict:
-        """CIS 6.1.13 - Audit SUID/SGID executables"""
-        code, output, _ = self._run_command(
-            "df --local -P 2>/dev/null | awk 'NR!=1 {print $6}' | "
-            "xargs -I '{}' find '{}' -xdev \\( -perm -4000 -o -perm -2000 \\) -type f 2>/dev/null | wc -l"
-        )
-        count = int(output) if output and output.isdigit() else 0
-        # This is informational - some SUID files are expected
-        return {
-            'passed': True,  # Informational check
-            'actual': f'{count} SUID/SGID files found (review recommended)',
-            'expected': 'SUID/SGID files should be reviewed periodically',
-            'remediation': 'Review SUID/SGID files and remove unnecessary permissions'
-        }
-
-    # ==================== SERVICES CHECKS ====================
-
-    def check_xinetd_not_installed(self) -> Dict:
-        """CIS 2.1.1 - Ensure xinetd is not installed"""
-        installed = self._check_package_installed('xinetd')
-        return {
-            'passed': not installed,
-            'actual': 'xinetd installed' if installed else 'xinetd not installed',
-            'expected': 'xinetd should not be installed',
-            'remediation': 'Remove xinetd: apt remove xinetd'
-        }
-
-    def check_telnet_not_installed(self) -> Dict:
-        """CIS 2.2.18 - Ensure telnet server is not installed"""
-        installed = self._check_package_installed('telnetd') or self._check_package_installed('telnet-server')
-        return {
-            'passed': not installed,
-            'actual': 'telnet server installed' if installed else 'telnet server not installed',
-            'expected': 'telnet server should not be installed',
-            'remediation': 'Remove telnet server: apt remove telnetd'
-        }
-
-    def check_ftp_not_installed(self) -> Dict:
-        """CIS 2.2.9 - Ensure FTP server is not installed"""
-        installed = self._check_package_installed('vsftpd') or self._check_package_installed('proftpd')
-        return {
-            'passed': not installed,
-            'actual': 'FTP server installed' if installed else 'FTP server not installed',
-            'expected': 'FTP server should not be installed (use SFTP)',
-            'remediation': 'Remove FTP server: apt remove vsftpd'
-        }
-
-    def check_http_not_installed(self) -> Dict:
-        """CIS 2.2.10 - Ensure HTTP server is not installed"""
-        installed = self._check_package_installed('apache2') or self._check_package_installed('nginx')
-        return {
-            'passed': not installed,
-            'actual': 'HTTP server installed' if installed else 'HTTP server not installed',
-            'expected': 'HTTP server should not be installed unless required',
-            'remediation': 'Remove if not needed: apt remove apache2 nginx'
-        }
-
-    def check_ldap_not_installed(self) -> Dict:
-        """CIS 2.2.5 - Ensure LDAP server is not installed"""
-        installed = self._check_package_installed('slapd')
-        return {
-            'passed': not installed,
-            'actual': 'LDAP server installed' if installed else 'LDAP server not installed',
-            'expected': 'LDAP server should not be installed unless required',
-            'remediation': 'Remove if not needed: apt remove slapd'
-        }
-
-    def check_nfs_not_installed(self) -> Dict:
-        """CIS 2.2.7 - Ensure NFS is not installed"""
-        installed = self._check_package_installed('nfs-kernel-server')
-        return {
-            'passed': not installed,
-            'actual': 'NFS server installed' if installed else 'NFS server not installed',
-            'expected': 'NFS server should not be installed unless required',
-            'remediation': 'Remove if not needed: apt remove nfs-kernel-server'
-        }
-
-    # ==================== RUNNER ====================
-
-    def run_all_checks(self, categories: Optional[List[str]] = None, min_severity: str = 'all') -> Dict:
-        """Run all compliance checks and return results"""
-        severity_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}
-        min_sev_level = severity_order.get(min_severity, 999)
-
-        self.results['scan_time'] = datetime.now().isoformat()
-        self.results['checks'] = []
-
-        categories_to_scan = categories if categories else self.checks.keys()
-
-        for category in categories_to_scan:
-            if category not in self.checks:
-                continue
-
-            for check_id, check_name, severity, check_func in self.checks[category]:
-                # Filter by severity
-                if min_severity != 'all' and severity_order.get(severity, 999) > min_sev_level:
-                    continue
-
-                try:
-                    result = check_func()
-                    self.results['checks'].append({
-                        'id': check_id,
-                        'category': category,
-                        'name': check_name,
-                        'severity': severity,
-                        'status': 'PASS' if result['passed'] else 'FAIL',
-                        'actual': result.get('actual', ''),
-                        'expected': result.get('expected', ''),
-                        'remediation': result.get('remediation', '')
-                    })
-                except Exception as e:
-                    self.results['checks'].append({
-                        'id': check_id,
-                        'category': category,
-                        'name': check_name,
-                        'severity': severity,
-                        'status': 'ERROR',
-                        'actual': f'Error running check: {str(e)}',
-                        'expected': '',
-                        'remediation': ''
-                    })
-
-        return self.results
+    def nfs_server_review(self) -> Outcome:
+        return self._absent_unless_required("NFS server", ["nfs-kernel-server"])

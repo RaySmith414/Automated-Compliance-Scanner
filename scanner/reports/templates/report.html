@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compliance Scan Report - {{ result.system_info.hostname }} - {{ result.scan_time }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f7fa; color: #333; line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header {
+            background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+            color: white; padding: 40px; border-radius: 10px; margin-bottom: 30px;
+        }
+        .header h1 { font-size: 2rem; margin-bottom: 10px; }
+        .header .subtitle { opacity: 0.9; font-size: 1.1rem; }
+        .header-meta { margin-top: 20px; opacity: 0.9; }
+        .header-meta p { margin: 4px 0; }
+        .notice {
+            background: #fffaf0; border-left: 4px solid #dd6b20; padding: 14px 18px;
+            border-radius: 0 8px 8px 0; margin-bottom: 24px; color: #7b341e;
+        }
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px; margin-bottom: 30px;
+        }
+        .stat-card { background: white; padding: 20px; border-radius: 10px; text-align: center;
+                     box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .stat-value { font-size: 2.1rem; font-weight: bold; }
+        .stat-label { color: #666; margin-top: 4px; font-size: 0.9rem; }
+        .stat-pass { color: #2f855a; } .stat-fail { color: #c53030; } .stat-rate { color: #2b6cb0; }
+        .stat-other { color: #975a16; }
+        .section { background: white; border-radius: 10px; padding: 25px; margin-bottom: 30px;
+                   box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .section h2 { font-size: 1.3rem; margin-bottom: 16px; padding-bottom: 10px;
+                      border-bottom: 2px solid #edf2f7; color: #2d3748; }
+        .section p.lead { color: #4a5568; margin-bottom: 14px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #edf2f7; vertical-align: top; }
+        th { background: #f7fafc; font-weight: 600; color: #4a5568; }
+        .badge { padding: 3px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
+                 display: inline-block; white-space: nowrap; }
+        .badge-pass { background: #c6f6d5; color: #22543d; }
+        .badge-fail { background: #fed7d7; color: #9b2c2c; }
+        .badge-error { background: #feebc8; color: #9c4221; }
+        .badge-not_applicable { background: #e2e8f0; color: #2d3748; }
+        .badge-manual { background: #bee3f8; color: #2a4365; }
+        .severity { padding: 2px 9px; border-radius: 4px; font-size: 0.78rem; font-weight: 600;
+                    display: inline-block; }
+        .severity-critical { background: #9b2c2c; color: white; }
+        .severity-high { background: #c05621; color: white; }
+        .severity-medium { background: #ecc94b; color: #5f370e; }
+        .severity-low { background: #718096; color: white; }
+        .cis-id { font-size: 11px; color: #4a5568; white-space: nowrap; }
+        .tag { display: inline-block; background: #ebf8ff; color: #2a4365; padding: 1px 7px;
+               border-radius: 4px; margin: 1px; font-size: 0.78rem; font-weight: 500; }
+        .detail { margin-top: 8px; padding: 10px 12px; background: #f7fafc; border-radius: 5px;
+                  border-left: 3px solid #cbd5e0; font-size: 0.92rem; color: #4a5568; }
+        .detail strong { color: #2d3748; }
+        .progress-bar { height: 8px; background: #edf2f7; border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #38a169; }
+        .progress-fill.warning { background: #d69e2e; }
+        .progress-fill.danger { background: #e53e3e; }
+        .footer { text-align: center; color: #718096; padding: 24px 20px; font-size: 0.9rem; }
+        code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 0.88rem; }
+        @media print {
+            body { background: white; }
+            .section, .stat-card { box-shadow: none; border: 1px solid #edf2f7; }
+            .header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .stats-grid { grid-template-columns: repeat(4, 1fr); }
+            tr { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Compliance Scan Report</h1>
+        <p class="subtitle">{{ result.benchmark.family }}, mapped to NIST SP 800-53 Rev. 5, SOC 2 and ISO/IEC 27001:2022</p>
+        <div class="header-meta">
+            <p><strong>Host:</strong> {{ result.system_info.hostname }}</p>
+            <p><strong>Operating system:</strong> {{ result.system_info.distribution }} ({{ result.system_info.architecture }})</p>
+            <p><strong>Kernel:</strong> {{ result.system_info.kernel }}</p>
+            <p><strong>Scan time (UTC):</strong> {{ result.scan_time }}</p>
+            <p><strong>Scanner:</strong> Automated Compliance Scanner {{ result.scanner_version }}</p>
+        </div>
+    </div>
+
+    {% if not result.privileged %}
+    <div class="notice"><strong>Partial scan.</strong> The scanner ran without {{ 'root' if result.platform == 'linux' else 'administrator rights' }}. Checks that need those rights are listed as ERROR and are not counted in the compliance rate.</div>
+    {% elif summary.errors %}
+    <div class="notice"><strong>{{ summary.errors }} check(s) could not be assessed.</strong> They are listed as ERROR and are not counted in the compliance rate.</div>
+    {% endif %}
+
+    <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value">{{ summary.total_checks }}</div><div class="stat-label">Checks run</div></div>
+        <div class="stat-card"><div class="stat-value stat-pass">{{ summary.passed }}</div><div class="stat-label">Passed</div></div>
+        <div class="stat-card"><div class="stat-value stat-fail">{{ summary.failed }}</div><div class="stat-label">Failed</div></div>
+        <div class="stat-card"><div class="stat-value stat-other">{{ summary.errors }}</div><div class="stat-label">Not assessed (error)</div></div>
+        <div class="stat-card"><div class="stat-value stat-other">{{ summary.manual }}</div><div class="stat-label">Manual review</div></div>
+        <div class="stat-card"><div class="stat-value">{{ summary.not_applicable }}</div><div class="stat-label">Not applicable</div></div>
+        <div class="stat-card">
+            <div class="stat-value stat-rate">{% if summary.compliance_rate is none %}n/a{% else %}{{ summary.compliance_rate }}%{% endif %}</div>
+            <div class="stat-label">Compliance rate (pass / assessed)</div>
+            {% if summary.compliance_rate is not none %}
+            <div class="progress-bar" style="margin-top: 10px;">
+                <div class="progress-fill {% if summary.compliance_rate < 50 %}danger{% elif summary.compliance_rate < 80 %}warning{% endif %}" style="width: {{ summary.compliance_rate }}%;"></div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Summary</h2>
+        <p class="lead">{{ summary.assessed }} of {{ summary.total_checks }} checks produced a verdict.
+        {{ summary.failed_by_severity.critical }} critical and {{ summary.failed_by_severity.high }} high severity checks failed.</p>
+    </div>
+
+    {% for key in framework_keys %}
+    {% set section = result.framework_summary[key] %}
+    {% if section.controls %}
+    <div class="section">
+        <h2>{{ section.label }}: control coverage</h2>
+        <table>
+            <thead><tr><th>Control</th><th>Name</th><th>Passed</th><th>Failed</th><th>No verdict</th><th>Compliance</th></tr></thead>
+            <tbody>
+            {% for control in section.controls %}
+            <tr>
+                <td><strong>{{ control.control_id }}</strong></td>
+                <td>{{ control.control_name }}</td>
+                <td>{{ control.checks_passed }}</td>
+                <td>{{ control.checks_failed }}</td>
+                <td>{{ control.checks_no_verdict }}</td>
+                <td>{% if control.compliance_percentage is none %}n/a{% else %}{{ control.compliance_percentage }}%{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    {% for category, category_checks in checks_by_category %}
+    <div class="section">
+        <h2>{{ category | replace('_', ' ') | title }}</h2>
+        <table>
+            <thead><tr>
+                <th style="width: 120px;">ID</th><th>Check</th><th style="width: 90px;">Severity</th>
+                <th style="width: 130px;">Status</th><th style="width: 220px;">Mapped controls</th>
+            </tr></thead>
+            <tbody>
+            {% for check in category_checks %}
+            <tr>
+                <td><code>{{ check.id }}</code>{% if check.cis.id %}<br><span class="cis-id">CIS {{ check.cis.id }}</span>{% endif %}</td>
+                <td>
+                    <strong>{{ check.title }}</strong>
+                    <div class="detail">
+                        <strong>Found:</strong> {{ check.actual }}<br>
+                        <strong>Expected:</strong> {{ check.expected }}
+                        {% if check.status in ('FAIL', 'MANUAL') %}<br><strong>Remediation:</strong> {{ check.remediation }}{% endif %}
+                    </div>
+                </td>
+                <td><span class="severity severity-{{ check.severity }}">{{ check.severity | upper }}</span></td>
+                <td><span class="badge badge-{{ check.status | lower }}">{{ check.status | replace('_', ' ') }}</span></td>
+                <td>
+                    {% for control in check.frameworks.nist_800_53 %}<span class="tag">{{ control.control_id }}</span>{% endfor %}
+                    {% for control in check.frameworks.soc2 %}<span class="tag">{{ control.control_id }}</span>{% endfor %}
+                    {% for control in check.frameworks.iso_27001 %}<span class="tag">{{ control.control_id }}</span>{% endfor %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endfor %}
+
+    <div class="footer">
+        <p>Generated by Automated Compliance Scanner {{ result.scanner_version }}</p>
+        <p>Framework mappings are an informative crosswalk, not an official publication of NIST, the AICPA, ISO or CIS.</p>
+    </div>
+</div>
+</body>
+</html>
